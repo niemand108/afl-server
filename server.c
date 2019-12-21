@@ -2,8 +2,7 @@
 #include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <sys/wait.h>
-#include<signal.h>
+#include <signal.h>
 
 pid_t fuzzer_pid, server_pid;
 __sighandler_t prevhandler;
@@ -22,7 +21,7 @@ int main(int argc, char** argv) {
     
     fuzzer_pid = getpid();
     
-    printf("Escribe algo para que pete:\n");
+    printf("Write something:\n");
 
     if (fork() != 0)  //PARENT: fuzzer
     {
@@ -41,6 +40,7 @@ int main(int argc, char** argv) {
                 break;
             }
         }
+        sleep(10);
         fclose(fptr);
         exit(0);
     }
