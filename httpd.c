@@ -39,7 +39,7 @@ void handlers_off(){
 
 void handle_sig(int sig)
 {
-    printf("Sigsev signal received: %d, pid: %d\n", sig, getpid());
+    printf("Connection signal received: %d, pid: %d\n", sig, getpid());
     handlers_off();
     kill(getpid(), sig);
 }
