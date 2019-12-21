@@ -11,8 +11,9 @@ int signals[number_signals] = {SIGHUP, SIGQUIT, SIGILL, SIGTRAP,
                                SIGABRT, SIGBUS, SIGFPE, SIGSEGV, SIGPIPE,
                                SIGTERM, SIGSTKFLT, SIGSTOP, SIGTSTP};
 
-struct sigaction  prevhandlers_fuzz[number_signals];
-struct sigaction  prevhandlers_server[number_signals];
+struct sigaction prevhandlers_fuzz[number_signals];
+struct sigaction prevhandlers_server[number_signals];
+struct sigaction prevhandler_conn;
 
 void handle_sig_fuzz(int);
 void handlers_on_fuzz();
@@ -22,6 +23,9 @@ void handlers_on_server();
 void handlers_off_server();
 void send_signal_fuzz(int);
 void send_signal_server(int);
+void handler_connection_on();
+void handler_connection_off();
+void handle_sig_connection(int);
 
 int is_handled(int sig)
 {
@@ -29,6 +33,20 @@ int is_handled(int sig)
         if(signals[s] == sig)
             return 1;
     return 0;
+}
+
+void handler_on_connection(){
+    struct sigaction new_action;
+    new_action.sa_handler = handle_sig_connection;
+    sigemptyset (&new_action.sa_mask);
+    new_action.sa_flags = 0;
+    sigaction (SIGCHLD, NULL, &prevhandler_conn);
+    sigaction (SIGCHLD, &new_action, NULL);
+}
+
+void handler_off_connection(){
+    sigaction (SIGCHLD, &prevhandler_conn, NULL);
+    printf("Signals handlers connections OFF\n");
 }
 
 void handlers_on_server()
@@ -88,6 +106,15 @@ void handle_sig_fuzz(int sig){
     kill(fuzzer_pid, sig);
 }
 
+void handle_sig_connection(int sig){
+    pid_t pid_conn;
+    int status;
+    printf("Connection signal received: %d\n", sig);
+    while ((pid_conn = waitpid(-1, &status, WNOHANG)) != -1){
+        send_signal_server(WTERMSIG(status));
+    }
+}
+
 void send_signal_server(int s){
     //sending before, otherwise could be later
     send_signal_fuzz(s);
@@ -143,28 +170,26 @@ int main(int argc, char** argv) {
         sleep(1);
         int status = 0;
         handlers_on_server();
+        handler_on_connection();
         if (fork() == 0) //CONNECTION
         {
-            sleep(5);
+            sleep(1);
             if (execve("./httpd", NULL, NULL) < 0)
             {
                 perror("error");
             } else {
-                printf("executed ./httpd\n");
+                printf("executed ./sigsev\n");
             }
             printf("bye child execve\n");
-        } else {
-            while( wait(&status) > 0);    
-
-            if(WIFSIGNALED(status)){
-                int s = WTERMSIG(status);
-                if(is_handled(s)){
-                    printf("child exited with = %d\n", s);
-                    send_signal_server(s);
-                }
-            }
-            printf("Bye child from server.\n");
+            fflush(stdout);
         }
-    }       
+        else
+        {
+            //while( wait(&status) > 0);
+            while(sleep(1) == 0);
+        }
+        printf("Bye child from server.\n");
+    }
+        
 return 0;
 }
