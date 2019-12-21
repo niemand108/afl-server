@@ -150,7 +150,7 @@ int main(int argc, char** argv) {
             {
                 perror("error");
             } else {
-                printf("executed ./sigsev\n");
+                printf("executed ./httpd\n");
             }
             printf("bye child execve\n");
         } else {
@@ -165,8 +165,6 @@ int main(int argc, char** argv) {
             }
             printf("Bye child from server.\n");
         }
-
-    }
-        
+    }       
 return 0;
 }
