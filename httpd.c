@@ -57,7 +57,6 @@ int main(int argc, char** argv) { //CONNECTION
     }
     else //SELECT
     {
-
         while((parent_pid = wait(&status)) > 0);
         printf("child exit -> received signal (%d)\nBye from sigsev.\n", WTERMSIG(status));
     }
