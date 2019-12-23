@@ -11,7 +11,6 @@
 #include <time.h>
 #include <assert.h>
 
-
 #define MAX_SIZE_REQUEST 200000
 #define MAX_SIZE_RESPONSE 200000
 #define LOG_REQUESTS "./logs/requests"
@@ -52,12 +51,12 @@ static void debug_request(int, char *, int);
 
 static void die(const char *format, ...)
 {
-	va_list vargs;
-	va_start(vargs, format);
-	fprintf(stderr, "DIE: ");
-	vfprintf(stderr, format, vargs);
-	fprintf(stderr, ".\n");
-	va_end(vargs);
+    va_list vargs;
+    va_start(vargs, format);
+    fprintf(stderr, "DIE: ");
+    vfprintf(stderr, format, vargs);
+    fprintf(stderr, ".\n");
+    va_end(vargs);
     debug("DIE: Signaling to [pid:%d] with SIGUSR & exit(1)", getpid());
     kill(SIGUSR2, getpid());
     exit(1);
@@ -78,7 +77,7 @@ static void debug(const char *format, ...)
     vprintf(format, vargs);
     printf("\n");
     va_end(vargs);
-	va_start(vargs, format);
+    va_start(vargs, format);
     fprintf(fptr, "%s [pid:%d] ", t_s, actual_pid);
     vfprintf(fptr, format, vargs);
     fprintf(fptr, ".\n");
@@ -96,7 +95,6 @@ static void debug_request(int id_request, char* request, int size_request)
     struct tm *tm = localtime(&t);
     char t_s[64];
     assert(strftime(t_s, sizeof(t_s), "[%x %X]", tm));
-
     fprintf(fptr, "%s [pid:%d] ", t_s, actual_pid);
     fprintf(fptr, "REQUEST id=%d, size=%d\n", id_request,size_request);
     fprintf(fptr, "%s\n", request);
@@ -113,7 +111,6 @@ static void debug_response(int id_request, char * response, int size_response)
     struct tm *tm = localtime(&t);
     char t_s[64];
     assert(strftime(t_s, sizeof(t_s), "[%x %X]", tm));
-
     fprintf(fptr, "%s [pid:%d] ", t_s, actual_pid);
     fprintf(fptr, "RESPONSE id=%d, size=%d\n", id_request, size_response);
     fprintf(fptr, "%s\n", response);

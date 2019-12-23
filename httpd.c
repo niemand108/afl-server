@@ -11,7 +11,6 @@
 #include <time.h>
 #include <assert.h>
 
-
 #define LOG_DEBUG_HTTPD "./logs/debug-httpd"
 const int number_signals = 15;
 int signals[number_signals] = {SIGINT, SIGHUP, SIGQUIT, SIGILL, SIGTRAP,
@@ -46,7 +45,7 @@ static void debug(const char *format, ...)
     vprintf(format, vargs);
     printf("\n");
     va_end(vargs);
-	va_start(vargs, format);
+    va_start(vargs, format);
     fprintf(fptr, "%s [pid:%d] ", t_s, actual_pid);
     vfprintf(fptr, format, vargs);
     fprintf(fptr, ".\n");
@@ -69,7 +68,7 @@ void handlers_on()
 }
 
 void handlers_off(){
-        debug("Signals handlers OFF for HTTPD process");
+    debug("Signals handlers OFF for HTTPD process");
     for (int s = 0; s < number_signals; s++){
         signal(signals[s], SIG_DFL);
         //sigaction (signals[s], &(prevhandlers[s]), NULL);
@@ -90,7 +89,6 @@ void handle_sig(int sig, siginfo_t *si, void *ucontext)
     }  
     else 
     {
-
         union sigval sv;
         
         if(si != NULL)
@@ -120,7 +118,7 @@ void handle_sig_default(int sig, siginfo_t *si, void *ucontext){
 }
 
 void handler_default_on(){
-        debug("Signals default handlers ON for HTTPD process");
+    debug("Signals default handlers ON for HTTPD process");
     for (int s = 1; s <= 62; s++){
         if(!is_handled(s))
         {
