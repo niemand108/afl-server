@@ -2,7 +2,7 @@
 
 Basic AFL structure for a server
 ================================
-
+```
 +----------------+                +----------------+
 |                |                |                |              +-------------------+
 |   AFL(fuzzer)  +--------------->+   _AFL_LOOP    +-------------->                   |
@@ -19,7 +19,7 @@ Basic AFL structure for a server
               +------------------>+               +--------------->   PROCESS REQUEST  |
                                   +---------------+               |                    |
                                                                   +--------------------+
-
+```
 Requeriments 
 ============
 
@@ -32,8 +32,10 @@ $ make
 
 Logs
 ====
-In ./logs:
-  debug: general debugging info
-  debug-httpd: for httpd process info
-  request: all the requests by id_request
-  response: all the responses (with the id_request associated)
+```
+./logs
+├── debug                   general debugging info
+├── debug-httpd             for httpd process info
+├── request                 all the requests by id_request
+└── response                all the responses (with the id_request associated)
+```
