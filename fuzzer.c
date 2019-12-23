@@ -57,7 +57,10 @@ static void die(const char *format, ...)
     vfprintf(stderr, format, vargs);
     fprintf(stderr, ".\n");
     va_end(vargs);
+    va_start(vargs, format);
+    debug(format, vargs);
     debug("DIE: Signaling to [pid:%d] with SIGUSR & exit(1)", getpid());
+    va_end(vargs);
     kill(SIGUSR2, getpid());
     exit(1);
 }
@@ -166,10 +169,10 @@ int send_request(char *request, size_t size_request){
     char buf_r[MAX_SIZE_RESPONSE+1];
     memset(buf_r, 0, MAX_SIZE_RESPONSE+1);
 
+    debug("(id_req: %d) Reading response...", id_request);
     //TODO: timeout read
     for (;;)
     {
-        debug("(id_req: %d) Reading response...", id_request);
         if (max_resp_reads <= 0){
             break;
         }
@@ -213,7 +216,7 @@ int is_handled(int sig)
 }
 
 void handle_sig_default(int sig, siginfo_t *si, void *ucontext){
-    debug("Unhandle sig: %d", sys_siglist[sig]);
+    debug("Unhandle sig: %s", sys_siglist[sig]);
 }
 
 void handler_default_on(){
@@ -351,7 +354,7 @@ void handle_sig_fuzz(int sig, siginfo_t *si, void *ucontext){
         if(connection_pid != -1)
             kill(connection_pid, sig);
         kill(server_pid, sig);
-        //kill(fuzzer_pid, sig);
+        kill(fuzzer_pid, sig);
     }  
     else 
     {
@@ -431,7 +434,7 @@ void handle_sig_connection(int sig, siginfo_t *si, void *ucontext){
 
             handlers_on_fuzz();
             int loop = 0;
-            while (__AFL_LOOP(1000))
+            while (__AFL_LOOP(10000))
             {
                 loop++;
                 char buf[MAX_SIZE_REQUEST + 1];
@@ -440,7 +443,7 @@ void handle_sig_connection(int sig, siginfo_t *si, void *ucontext){
                 ssize_t size_request = 0, size_partial;
                 memset(buf, 0, MAX_SIZE_REQUEST);
 
-                debug("(loop:%d) Reading...", loop);
+                debug("(loop:%d) Reading stdin...", loop);
                 for (;;)
                 {
                     if (max_reads <= 0)
