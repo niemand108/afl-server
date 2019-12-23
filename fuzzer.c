@@ -440,15 +440,16 @@ void handle_sig_connection(int sig, siginfo_t *si, void *ucontext){
                 ssize_t size_request = 0, size_partial;
                 memset(buf, 0, MAX_SIZE_REQUEST);
 
+                debug("(loop:%d) Reading...", loop);
                 for (;;)
                 {
                     if (max_reads <= 0)
                         break;
-                    debug("(loop:%d) Reading...", loop);
                     max_reads--;
                     size_partial = read(0, buf + size_request, chunk_size);
                     if (size_partial > 0)
                     {
+                        debug("(loop:%d) Reading chunk...%d", loop, chunk_size);
                         size_request += size_partial;
                     }
                     else if (size_partial < 0)
@@ -487,7 +488,7 @@ void handle_sig_connection(int sig, siginfo_t *si, void *ucontext){
                     size_request = MAX_SIZE_REQUEST;
                 }
 
-                debug("(loop:%d) sending... %s (size: %d)", loop, buf, size_request);
+                debug("(loop:%d) sending... (size: %d)", loop, size_request);
                 int s_r = send_request(buf, size_request);
                 if (s_r < 0)
                     debug("(loop:%d) sending error:%d", s_r);

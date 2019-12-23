@@ -114,7 +114,7 @@ void handle_sig(int sig, siginfo_t *si, void *ucontext)
 }
 
 void handle_sig_default(int sig, siginfo_t *si, void *ucontext){
-    debug("Unhandle sig: %s", sys_siglist[sig]);
+    debug("Unhandle sig: %d", sys_siglist[sig]);
 }
 
 void handler_default_on(){
