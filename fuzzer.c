@@ -121,8 +121,6 @@ int send_request(char *request, size_t size_request){
                 die("(id_req: %d) Error reading response [read:%d, errno: %s]", id_request, size_response, strerror(errno));
             }
         } else {
-            //printf("->>> %d, %d\n", size_response, strlen(buf_r));
-            //fflush(stdout);
             debug("(id_req: %d) HTTP RESPONSE [size: %d])", id_request, size_response);
             break;
         }

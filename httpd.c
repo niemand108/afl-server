@@ -53,13 +53,16 @@ void handlers_httpd_off(){
     debug("HTTPD | Signals OFF");
     for (int s = 0; s < number_signals; s++){
         signal(signals[s], SIG_DFL);
-        //sigaction (signals[s], &(prevhandlers[s]), NULL);
     }
  }
 
 void handle_sig(int sig, siginfo_t *si, void *ucontext)
 {
-    debug("HTTPD | Handling signal | --%s-- | [pid: %d]", sys_siglist[sig], getpid());
+    char header_log[200];
+    snprintf(header_log, 200, "HTTPD | Handling signal | --%s-- (%d) |", \
+                                sys_siglist[sig], getpid());
+    debug(header_log);
+
     handlers_httpd_off();
 
     if(sig == SIGCHLD){
@@ -69,31 +72,27 @@ void handle_sig(int sig, siginfo_t *si, void *ucontext)
         while ((chld = waitpid(-1, &status, WUNTRACED | WNOHANG)) != -1)
                 ;
 
-        int signal_child = why_child_exited(chld, status, \
-                                            "HTTPD | Handling signal | %s |", \
-                                            sys_siglist[sig] );
-        if(signal_child == 0 )
+        int signal_child = why_child_exited(chld, status,
+                                            header_log);
+        if (signal_child == 0)
         {
-            debug("HTTPD | Handling signal | Child exit OK");
+            debug("%s Child exit OK", header_log);
             return;
         }
 
-        debug("HTTPD | Handling signal | Raising child signal to this process");
+        debug("%s Raising child signal to this process", header_log);
         raise(signal_child);
     } 
     else if (sig != SIGUSR2)
     {
-        debug("HTTPD | Handling signal | %s", sys_siglist[sig]);
-        debug("HTTPD | Handling signal | %s | Sending signal %s to %d, %d",\
-                 sys_siglist[sig],  sys_siglist[sig],  conn_pid, server_pid);
+        debug("%s Sending signal %s to %d, %d",\
+                 header_log,  sys_siglist[sig],  conn_pid, server_pid);
         if (conn_pid != -1 && getpid() != conn_pid)
             kill(conn_pid, sig);
         kill(server_pid, sig);
     }  
     else if( sig == SIGUSR2)
-    {
-        debug("HTTPD | Handling signal | %s", sys_siglist[sig]);
-        union sigval sv;
+    {        union sigval sv;
         
         if(si != NULL)
             sv.sival_int = si->si_value.sival_int;
@@ -101,22 +100,22 @@ void handle_sig(int sig, siginfo_t *si, void *ucontext)
             sv.sival_int = 0xD1E;
         
         if(conn_pid != -1){
-            debug("HTTPD | Handling signal | %s | Queueing %s to %d because SIGUSR2", \
-                sys_siglist[sig], sys_siglist[SIGINT], conn_pid);
+            debug("%s Queueing %s to %d because SIGUSR2", \
+                header_log, sys_siglist[SIGINT], conn_pid);
             sigqueue(conn_pid, SIGINT, sv);
         }
 
-        debug("HTTPD | Handling signal | %s | Queueing %s to %d because SIGUSR2", \
-                sys_siglist[sig], sys_siglist[SIGINT], getpid());
+        debug("%s Queueing %s to %d because SIGUSR2", \
+                header_log, sys_siglist[SIGINT], getpid());
         sigqueue(getpid(), SIGINT, sv); //TODO podrian ser equivalentes
   
         
-        debug("HTTPD | Handling signal | %s | Queueing %s to %d because SIGUSR2", \
-                sys_siglist[sig], sys_siglist[SIGINT], server_pid);
+        debug("%s Queueing %s to %d because SIGUSR2", \
+                header_log, sys_siglist[SIGINT], server_pid);
 
         sigqueue(server_pid, SIGUSR2, sv); //TODO podrian ser equivalentes
     }
-    debug("HTTPD | Handling signal | %s | End", sys_siglist[sig]);
+    debug("%s End", header_log, sys_siglist[sig]);
 }
 
 void handle_sig_default(int sig, siginfo_t *si, void *ucontext)

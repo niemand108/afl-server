@@ -77,14 +77,14 @@ int why_child_exited(pid_t child, int status, char *format_log, ...)
         }
         else if (WIFSIGNALED(status))
         {
-            debug("%s [pid: %d killed by signal %s]", \
-                    format_header, child, sys_siglist[WTERMSIG(status)]);
+            debug("%s [pid: %d killed by signal %s (%d)]", \
+                    format_header, child, sys_siglist[WTERMSIG(status)], WTERMSIG(status));
             return WTERMSIG(status);
         }
         else if (WIFSTOPPED(status))
         {
-            debug("%s [pid: %d stopped by signal %s]",\
-                    format_header, child, sys_siglist[WSTOPSIG(status)]);
+            debug("%s [pid: %d stopped by signal %s (%s)]",\
+                    format_header, child, sys_siglist[WSTOPSIG(status)], WSTOPSIG(status));
             return WSTOPSIG(status);
         }
         else if (WIFCONTINUED(status))
