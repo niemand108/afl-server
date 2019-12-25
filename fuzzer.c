@@ -36,25 +36,6 @@ void handler_default_on();
 void handler_default_off();
 int send_request(char *, size_t);
 static void die(const char *format, ...);
-static void debug_response(int, char *, int);
-static void debug_request(int, char *, int);
-
-static void debug_request(int id_request, char* request, int size_request)
-{
-    char log[200];
-    snprintf(log, 200, "\nREQUEST id=%d, size=%d\n", id_request, size_request);
-    debug_to(LOG_REQUEST, log);
-    debug_to(LOG_REQUEST, request);
-}
-
-static void debug_response(int id_request, char * response, int size_response)
-{
-    char log[200];
-    snprintf(log, 200, "RESPONSE id=%d, size=%d\n", id_request, size_response);
-    debug_to(LOG_RESPONSE, log);
-    debug_to(LOG_RESPONSE, response);
-}
-
 
 int send_request(char *request, size_t size_request){				
     const char *hostname = HOSTNAME_HTTPD;
@@ -71,28 +52,28 @@ int send_request(char *request, size_t size_request){
 
     int err = getaddrinfo(hostname, portname, &hints, &res);
     if (err != 0){
-        die("(id_req: %d) Failed to resolve remote socket address (err=%d)", id_request, err);
+        die("(id_req: %d) Failed to resolve remote socket address (err=%d)\n", id_request, err);
     } 
 
     int fd = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
     if (fd == -1){
-        die("(id_req: %d) Socket: %s name: %s port:%d", id_request, strerror(errno), res->ai_canonname, portname);
+        die("(id_req: %d) Socket: %s name: %s port:%d\n", id_request, strerror(errno), res->ai_canonname, portname);
     }
 
-    debug("(id_req: %d) Conectando...", id_request);
+    debug_info("(id_req: %d) Conectando...\n", id_request);
     if (connect(fd, res->ai_addr, res->ai_addrlen) == -1)
     {
-        die("(id_req: %d) Socket connect: %s", id_request, strerror(errno));
+        die("(id_req: %d) Socket connect: %s\n", id_request, strerror(errno));
     }
 
     int written;
     if ((written = write(fd, request, size_request)) == -1){
-        debug("(id_req: %d) write socket:  %s", id_request, strerror(errno));
+        debug_info("(id_req: %d) write socket:  %s\n", id_request, strerror(errno));
         return -EAGAIN;
     }
     assert(written == size_request);
 
-    debug("(id_req: %d) HTTP REQUEST DONE [written:%d size_request:%d]", id_request, written, size_request);
+    debug_info("(id_req: %d) HTTP REQUEST DONE [written:%d size_request:%d]\n", id_request, written, size_request);
     debug_request(id_request, request, size_request);
 
     freeaddrinfo(res);
@@ -103,7 +84,7 @@ int send_request(char *request, size_t size_request){
     char buf_r[MAX_SIZE_RESPONSE+1];
     memset(buf_r, 0, MAX_SIZE_RESPONSE+1);
 
-    debug("(id_req: %d) Reading response...", id_request);
+    debug_info("(id_req: %d) Reading response... | ", id_request);
     //TODO: timeout read
     for (;;)
     {
@@ -117,11 +98,11 @@ int send_request(char *request, size_t size_request){
         }
         else if (size_partial < 0){
             if (errno != EINTR){
-                debug("(id_req: %d) Partial response [size: %d]\n%s\n(EOF) ", id_request, size_response, buf_r);
-                die("(id_req: %d) Error reading response [read:%d, errno: %s]", id_request, size_response, strerror(errno));
+                debug_info("Partial response [size: %d]\n%s\n(EOF)\n", size_response, buf_r);
+                die("Error reading response [read:%d, errno: %s]\n", size_response, strerror(errno));
             }
         } else {
-            debug("(id_req: %d) HTTP RESPONSE [size: %d])", id_request, size_response);
+            debug_info("HTTP RESPONSE [size: %d])\n", size_response);
             break;
         }
     }
@@ -131,7 +112,6 @@ int send_request(char *request, size_t size_request){
         buf_r[size_response] = '\0';
     }
     debug_response(id_request, buf_r, size_response);
-    debug("(id_req: %d) ending (read) response & return 0", id_request);
     close(fd);
     return size_response ;
 
@@ -146,7 +126,7 @@ int is_handled(int sig)
 }
 
 void handle_sig_default(int sig, siginfo_t *si, void *ucontext){
-    debug("Unhandle sig: %s", sys_siglist[sig]);
+    debug_info("Unhandle sig: %s\n", sys_siglist[sig]);
 }
 
 void handler_default_on(){
@@ -173,7 +153,7 @@ void handler_default_off(){
 
 void handler_on_connection()
 {
-    debug("Connection | Signals ON");
+    debug_info("Connection Signals ON\n");
     
     for (int s = 1; s <= 62; s++)
     {
@@ -190,7 +170,7 @@ void handler_on_connection()
 
 void handler_off_connection()
 {
-    debug("Connection | Signals OFF");
+    debug("Connection Signals OFF | ");
     for (int s = 1; s <= 62; s++)
     {
         if(is_handled(s))
@@ -202,7 +182,7 @@ void handler_off_connection()
 
 void handlers_on_server()
 {
-    debug("Server | Signals ON");
+    debug_info("Server Signals ON\n");
 
     struct sigaction new_action;
     new_action.sa_handler = handle_sig_server;
@@ -217,7 +197,7 @@ void handlers_on_server()
 
 void handlers_off_server()
 {
-    debug("Server | Signals OFF");
+    debug("Server Signals OFF | ");
     for (int s = 0; s < number_signals; s++)
     {
         signal(signals[s], SIG_DFL);
@@ -226,7 +206,7 @@ void handlers_off_server()
 
 void handlers_on_fuzz()
 {
-    debug("Fuzzer | Signals ON");
+    debug_info("Fuzzer Signals ON\n");
 
     struct sigaction new_action;
     new_action.sa_handler = handle_sig_fuzz;
@@ -241,7 +221,7 @@ void handlers_on_fuzz()
 
 void handlers_off_fuzz()
 {
-    debug("Fuzzer | Signals OFF");
+    debug("Signals Fuzzer OFF | ");
     for (int s = 0; s < number_signals; s++)
     {
         signal(signals[s], SIG_DFL);
@@ -250,35 +230,33 @@ void handlers_off_fuzz()
 
 
 void handle_sig_server(int sig, siginfo_t *si, void *ucontext){
-    char header_log[200];
-    snprintf(header_log, 200, "Server | Handling signal | --%s-- (%d) |", \
+    debug_info("Server | Handling signal --%s-- (%d) | ", \
                                 sys_siglist[sig], getpid());
-    debug(header_log);
     handlers_off_server();
-    if (sig!= SIGUSR2)
+    if (sig!=SIGUSR2)
     {
         if(sig ==SIGCHLD)
         {
             pid_t chld;
             int status;
-            while ((chld = waitpid(-1, &status, WUNTRACED | WNOHANG)) != -1)
-                ;
 
-            int signal_chld =  why_child_exited(chld, status, header_log);
+            while ((chld = waitpid(WAIT_ANY, &status, WUNTRACED | WNOHANG)) != -1);
 
-            if(signal_chld == 0)
+            int signal_chld = why_child_exited(chld, status);
+            if (signal_chld == 0)
             {
-                debug("%s Child %d exit OK", header_log, chld);
+                debug("Child %d exit OK, raising SIGINT to this process\n", chld);
+                raise(SIGINT);
                 return;
             }
 
-            debug("%s Raising child signal to this process", header_log );
+            debug("Raising child signal to this process\n");
             raise(signal_chld);
             return;
         }
         else
         {
-            debug("%s Sending/Raising signal to everyone", header_log);
+            debug("Sending/Raising signal to everyone\n");
             if(connection_pid != -1)
                 kill(connection_pid, sig);
             kill(fuzzer_pid, sig);
@@ -296,30 +274,28 @@ void handle_sig_server(int sig, siginfo_t *si, void *ucontext){
             sv.sival_int = 0xD1E;
         
        if(connection_pid != -1){
-            debug("%s Queueing %s to %d because SIGUSR2", \
-                header_log, sys_siglist[SIGINT], connection_pid);
+            debug("Queueing %s to %d because SIGUSR2", \
+                 sys_siglist[SIGINT], connection_pid);
             sigqueue(connection_pid, SIGINT, sv);
         }
 
-        debug("%s Queueing %s to %d because SIGUSR2", header_log,\
+        debug("Queueing %s to %d because SIGUSR2",\
                 sys_siglist[sig], sys_siglist[SIGINT], getpid());
         sigqueue(getpid(), SIGINT, sv); //TODO podrian ser equivalentes
   
         
-        debug("%s Queueing %s to %d because SIGUSR2", header_log,\
+        debug("Queueing %s to %d because SIGUSR2",\
                 sys_siglist[sig], sys_siglist[SIGINT], server_pid);
 
         sigqueue(server_pid, SIGUSR2, sv); //TODO podrian ser equivalentes
     }
 
-    debug("%s | End", header_log);
+    debug(" | End\n");
 }
 
 void handle_sig_fuzz(int sig, siginfo_t *si, void *ucontext){
-    char header_log[200];
-    snprintf(header_log, 200, "Fuzzer | Handling signal | --%s-- (%d) |", \
+    debug_info("Fuzzer | Handling signal --%s-- (%d) | ", \
                                 sys_siglist[sig], getpid());
-    debug(header_log);
     handlers_off_fuzz();
 
     if (sig != SIGUSR2)
@@ -328,27 +304,31 @@ void handle_sig_fuzz(int sig, siginfo_t *si, void *ucontext){
         {
             pid_t chld;
             int status;
-            while ((chld = waitpid(-1, &status, WUNTRACED | WNOHANG)) != -1)
+            while ((chld = waitpid(WAIT_ANY, &status, WUNTRACED | WNOHANG)) != -1)
                 ;
 
-            int signal_chld =  why_child_exited(chld, status, header_log);
+            int signal_chld =  why_child_exited(chld, status);
 
             if(signal_chld == 0)
             {
-                debug("%s Child %d exit OK", header_log, chld);
+                debug("Child %d exit OK, raising SIGCONT to this process\n", chld);
+                raise(SIGCONT);
                 return;
             }
 
-            debug("%s Raising child signal to this process", header_log );
+            debug("Raising SIG signal to this process");
+            debug("... & Closing logs\n " );
+            close_all_log();
             raise(signal_chld);
             return;
         }
         else
         {
-            debug("%s Sending/Raising signal to everyone", header_log);
+            debug("Sending/Raising signal to everyone\n");
             if(connection_pid != -1)
                 kill(connection_pid, sig);
             kill(server_pid, sig);
+            close_all_log();
             raise(sig);
             return;
         }
@@ -363,31 +343,29 @@ void handle_sig_fuzz(int sig, siginfo_t *si, void *ucontext){
             sv.sival_int = 0xD1E;
         
        if(connection_pid != -1){
-            debug("%s Queueing %s to %d because SIGUSR2", \
-                header_log, sys_siglist[SIGINT], connection_pid);
+            debug("Queueing %s to %d because SIGUSR2", \
+                sys_siglist[SIGINT], connection_pid);
             sigqueue(connection_pid, SIGINT, sv);
         }
 
-        debug("%s Queueing %s to %d because SIGUSR2", header_log,\
+        debug("Queueing %s to %d because SIGUSR2",\
                 sys_siglist[sig], sys_siglist[SIGINT], getpid());
         sigqueue(getpid(), SIGINT, sv); //TODO podrian ser equivalentes
   
         
-        debug("%s Queueing %s to %d because SIGUSR2", header_log,\
+        debug("Queueing %s to %d because SIGUSR2",\
                 sys_siglist[sig], sys_siglist[SIGINT], server_pid);
 
         sigqueue(server_pid, SIGUSR2, sv); //TODO podrian ser equivalentes
     }
 
-    debug("%s | End", header_log);
+    debug(" | End\n");
 }
 
 void handle_sig_connection(int sig, siginfo_t *si, void *ucontext){
-    char header_log[200];
-    snprintf(header_log, 200, "Fuzzer | Handling signal | --%s-- (%d) |", \
+    debug_info("Fuzzer | Handling signal --%s-- (%d) | ", \
                                 sys_siglist[sig], getpid());
-    debug(header_log);
-    handlers_off_fuzz();
+    handler_off_connection();
 
     if (sig != SIGUSR2)
     {
@@ -395,24 +373,25 @@ void handle_sig_connection(int sig, siginfo_t *si, void *ucontext){
         {
             pid_t chld;
             int status;
-            while ((chld = waitpid(-1, &status, WUNTRACED | WNOHANG)) != -1)
+            while ((chld = waitpid(WAIT_ANY, &status, WUNTRACED | WNOHANG)) != -1)
                 ;
 
-            int signal_chld =  why_child_exited(chld, status, header_log);
+            int signal_chld =  why_child_exited(chld, status);
 
             if(signal_chld == 0)
             {
-                debug("%s Child %d exit OK", header_log, chld);
+                debug("Child %d exit OK, raising SIGINT to this process", chld);
+                raise(SIGINT);
                 return;
             }
 
-            debug("%s Raising child signal to this process", header_log );
+            debug("Raising child signal to this process");
             raise(signal_chld);
             return;
         }
         else
         {
-            debug("%s Sending/Raising signal to everyone", header_log);
+            debug("Sending/Raising signal to everyone");
             if(connection_pid != -1)
                 kill(connection_pid, sig);
             kill(server_pid, sig);
@@ -430,32 +409,36 @@ void handle_sig_connection(int sig, siginfo_t *si, void *ucontext){
             sv.sival_int = 0xD1E;
         
        if(connection_pid != -1){
-            debug("%s Queueing %s to %d because SIGUSR2", \
-                header_log, sys_siglist[SIGINT], connection_pid);
+            debug("Queueing %s to %d because SIGUSR2", \
+                sys_siglist[SIGINT], connection_pid);
             sigqueue(connection_pid, SIGINT, sv);
         }
 
-        debug("%s Queueing %s to %d because SIGUSR2", header_log,\
+        debug("Queueing %s to %d because SIGUSR2",\
                 sys_siglist[sig], sys_siglist[SIGINT], getpid());
         sigqueue(getpid(), SIGINT, sv); //TODO podrian ser equivalentes
   
         
-        debug("%s Queueing %s to %d because SIGUSR2", header_log, \
+        debug("Queueing %s to %d because SIGUSR2", \
                 sys_siglist[sig], sys_siglist[SIGINT], server_pid);
 
         sigqueue(server_pid, SIGUSR2, sv); //TODO podrian ser equivalentes
     }
 
-    debug("%s | End", header_log);
+    debug("| End\n");
 }
 
 int main(int argc, char **argv)
 {
     srand(time(NULL));
+    
+    open_log(LOG_DEBUG);
+    open_log(LOG_REQUEST);
+    open_log(LOG_RESPONSE);
 
     fuzzer_pid = getpid();
     handler_default_on();       
-    debug("Write something:");
+    debug_info("Write something:\n");
 
     if ((server_pid = fork()) != 0) //PARENT: fuzzer
     {
@@ -472,7 +455,7 @@ int main(int argc, char **argv)
             ssize_t size_request = 0, size_partial;
             memset(buf, 0, MAX_SIZE_REQUEST);
 
-            debug("(loop:%d) Reading stdin...", loop);
+            debug_info("(loop:%d) Reading stdin...\n", loop);
             for (;;)
             {
                 if (max_reads <= 0)
@@ -481,7 +464,7 @@ int main(int argc, char **argv)
                 size_partial = read(0, buf + size_request, chunk_size);
                 if (size_partial > 0)
                 {
-                    debug("(loop:%d) Reading chunk...%d", loop, chunk_size);
+                    debug_info("(loop:%d) Reading chunk...%d\n", loop, chunk_size);
                     size_request += size_partial;
                 }
                 else if (size_partial < 0)
@@ -489,14 +472,14 @@ int main(int argc, char **argv)
                     if (errno != EINTR)
                     {
                         buf[size_request + 1] = '\0';
-                        debug("(loop:%d) STDIN ERROR (%s)", loop, strerror(errno));
-                        die("Error reading request [read:%d, errno: %s]", size_request, strerror(errno));
+                        debug_info("(loop:%d) STDIN ERROR (%s)\n", loop, strerror(errno));
+                        die("Error reading request [read:%d, errno: %s]\n", size_request, strerror(errno));
                     }
                 }
                 else
                 {
                     buf[size_request + 1] = '\0';
-                    debug( "(loop:%d) REQUEST [size: %d]", loop, size_request);
+                    debug_info( "(loop:%d) REQUEST [size: %d]\n", loop, size_request);
                     break;
                 }
             }
@@ -511,7 +494,7 @@ int main(int argc, char **argv)
             }
             else
             {
-                debug("(loop:%d) MAX_SIZE_REQUEST", loop);
+                debug_info("(loop:%d) MAX_SIZE_REQUEST\n", loop);
                 buf[MAX_SIZE_REQUEST - 5] = '\r';
                 buf[MAX_SIZE_REQUEST - 4] = '\n';
                 buf[MAX_SIZE_REQUEST - 3] = '\r';
@@ -520,14 +503,15 @@ int main(int argc, char **argv)
                 size_request = MAX_SIZE_REQUEST;
             }
 
-            debug("(loop:%d) sending... (size: %d)", loop, size_request);
+            debug_info("(loop:%d) sending... (size: %d)\n", loop, size_request);
             int s_r = send_request(buf, size_request);
             if (s_r < 0)
-                debug("(loop:%d) sending error:%d", s_r);
+                debug_info("(loop:%d) sending error:%d\n", s_r);
         }
         
-        debug("(loop:%d) | End");
+        debug_info("(loop:%d) | Final Loop\n", loop);
         kill(server_pid, SIGINT);
+        close_all_log();
         return 0;
     }
     else // CHILD: HTTP SERVER
@@ -548,9 +532,9 @@ int main(int argc, char **argv)
         {
             handler_on_connection();
 
-            pid_t pid_conn;
+            /*pid_t pid_conn;
             int status;
-            while ((pid_conn = waitpid(-1, &status, WUNTRACED | WNOHANG)) != -1);
+            while ((pid_conn = waitpid(WAIT_ANY, &status, WUNTRACED | WNOHANG)) != -1);
 
             int signal_child = why_child_exited(pid_conn, status, "Server-FORK | ");
 
@@ -560,14 +544,13 @@ int main(int argc, char **argv)
             }
 
             raise(signal_child);
-
-            debug("Server-Fork | everybody done");
+*/
+            debug_info("Server-Fork | everybody done\n");
             while(1){
                 sleep(2);
-                debug("Server-Fork | Sleeping & waiting to signal to be handled");
+                debug_info("Server-Fork | Sleeping & waiting to signal to be handled\n");
             }
-            //kill(server_pid, SIGUSR2);
-            //kill(fuzzer_pid, SIGUSR2);
+
             return 0;
         }
     }
