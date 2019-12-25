@@ -170,28 +170,11 @@ int main(int argc, char** argv) {
     }
     else //SELECT
     {
-        /*
-        pid_t pid_conn;
-        int status;
-        debug("HTTPD-PARENT | waiting child (socat)");
-        do{                
-                debug("whut");
-        } 
-        while ((pid_conn = waitpid(WAIT_ANY, &status, WUNTRACED| WNOHANG)) != -1);
-
-        int signal_child = why_child_exited(pid_conn, status, "HTTPD-PARENT| ");
-        if(signal_child == 0 ){
-            debug("HTTPD-PARENT | child(socat) exited OK");
-            return 0;
-        }
-
-        raise(signal_child);
-*/
-        debug_info("HTTPD-PARENT | everybody done\n");
         while(1){
             sleep(2);
             debug_info("HTTPD-PARENT | Sleeping & waiting to signal to be handled\n");
         }
+        debug_info("HTTPD-PARENT | everybody done\n");
     }
     return 0;
 }

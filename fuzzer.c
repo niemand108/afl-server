@@ -16,8 +16,6 @@
 #define MAX_SIZE_RESPONSE 200000
 #define HOSTNAME_HTTPD  0 /* localhost */
 #define PORTNAME_HTTPD "http"
-#define LOG_RESPONSE "./logs/response"
-#define LOG_REQUEST "./logs/request"
 
 pid_t fuzzer_pid=-1, server_pid=-1, connection_pid = -1;
 
@@ -532,24 +530,11 @@ int main(int argc, char **argv)
         {
             handler_on_connection();
 
-            /*pid_t pid_conn;
-            int status;
-            while ((pid_conn = waitpid(WAIT_ANY, &status, WUNTRACED | WNOHANG)) != -1);
-
-            int signal_child = why_child_exited(pid_conn, status, "Server-FORK | ");
-
-            if(signal_child == 0 ){
-                debug("Server-Fork | child(httpd) exited OK");
-                return 0;
-            }
-
-            raise(signal_child);
-*/
-            debug_info("Server-Fork | everybody done\n");
             while(1){
                 sleep(2);
                 debug_info("Server-Fork | Sleeping & waiting to signal to be handled\n");
             }
+            debug_info("Server-Fork | everybody done\n");
 
             return 0;
         }
