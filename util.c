@@ -1,12 +1,12 @@
-#include <sys/types.h>
-#include <unistd.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <signal.h>
-#include <sys/wait.h>
-#include <string.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <signal.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <unistd.h>
 
 #define MAX_LOGS_FILES 10
 #define LOG_STDIN "./logs/sdtin"
@@ -22,8 +22,6 @@ static void vdebug(const char *, va_list);
 static void debug_info(const char *format, ...);
 static void vdebug_info(const char *format, va_list);
 
-//static void debug_to(char *, char *, ...);
-//static void vdebug(const char *, va_list);
 static void debug_response(int, char *, int);
 static void debug_request(int, char *, int);
 int fd_log(char *);
@@ -36,31 +34,29 @@ int signals[number_signals] = {SIGINT, SIGHUP, SIGQUIT, SIGILL, SIGTRAP,
                                SIGABRT, SIGBUS, SIGFPE, SIGSEGV, SIGPIPE,
                                SIGTERM, SIGSTKFLT, SIGSTOP, SIGTSTP, SIGUSR2, SIGCHLD};
 
-struct logger {
+struct logger
+{
     char *name;
     int fd;
 };
 
 struct logger *loggers[MAX_LOGS_FILES];
 
-
 void vdebug(const char *format, va_list argp)
 {
     int fd = fd_log(LOG_DEBUG);
-    if(fd <= 0){
-        fprintf( stderr, "fd not found for %s", LOG_DEBUG);
+    if (fd <= 0) {
+        fprintf(stderr, "fd not found for %s", LOG_DEBUG);
         exit(-1);
     }
-    if(argp != NULL){
+    if (argp != NULL) {
         char log[MAX_LINE_LOG];
 
         vsnprintf(log, MAX_LINE_LOG, format, argp);
         printf("%s", log);
         if (write(fd, log, strlen(log)) < 0)
             perror("Writting error");
-    }
-    else 
-    {
+    } else {
         printf("%s", format);
         if (write(fd, format, strlen(format)) < 0)
             perror("Writting error");
@@ -75,21 +71,19 @@ static void debug(const char *format, ...)
     va_end(vargs);
 }
 
-
 static void debug_info(const char *format, ...)
 {
     va_list vargs;
     va_start(vargs, format);
     vdebug_info(format, vargs);
     va_end(vargs);
-
 }
 
 static void vdebug_info(const char *format, va_list argp)
 {
     int fd = fd_log(LOG_DEBUG);
-    if(fd <= 0){
-        fprintf( stderr, "fd not found for %s", LOG_DEBUG);
+    if (fd <= 0) {
+        fprintf(stderr, "fd not found for %s", LOG_DEBUG);
         exit(-1);
     }
 
@@ -102,16 +96,14 @@ static void vdebug_info(const char *format, va_list argp)
     printf("%s", log);
 
     if (write(fd, log, strlen(log)) < 0)
-            perror("Writting error");
+        perror("Writting error");
 
-    if(argp != NULL){
+    if (argp != NULL) {
         vsnprintf(log, MAX_LINE_LOG, format, argp);
         printf("%s", log);
         if (write(fd, log, strlen(log)) < 0)
             perror("Writting error");
-    }
-    else 
-    {
+    } else {
         printf("%s", format);
         if (write(fd, format, strlen(format)) < 0)
             perror("Writting error");
@@ -131,71 +123,67 @@ static void die(const char *format, ...)
     va_end(vargs);
     exit(-1);
 }
-int open_log(char * logname){
+int open_log(char *logname)
+{
     int fd = fd_log(logname);
-    if (fd <= 0 ){
+    if (fd <= 0) {
         perror("error in open log");
         exit(-1);
-    }
-    else
+    } else
         return fd;
 }
 
-int fd_log(char * log_name){
+int fd_log(char *log_name)
+{
     int l = 0;
-    for (l = 0; l < MAX_LOGS_FILES; l++)
-    {
-        if (loggers[l] == NULL)
-        {
+    for (l = 0; l < MAX_LOGS_FILES; l++) {
+        if (loggers[l] == NULL) {
             break;
         }
-        
-        if(strcmp(log_name, loggers[l]->name) == 0){ 
-            if (loggers[l]->fd >= 0)
-            {
+
+        if (strcmp(log_name, loggers[l]->name) == 0) {
+            if (loggers[l]->fd >= 0) {
                 return loggers[l]->fd;
             }
-        }
-        else
-        {
+        } else {
             continue;
         }
     }
-            
-    if( l >= MAX_LOGS_FILES){
+
+    if (l >= MAX_LOGS_FILES) {
         fprintf(stderr, "MAXLOGFILES reached");
         return -1;
     }
 
     int fd;
 
-    if((fd = open(log_name, O_WRONLY | O_CREAT | O_APPEND, 0755 )) < 0){
+    if ((fd = open(log_name, O_WRONLY | O_CREAT | O_APPEND, 0755)) < 0) {
         perror("error opening log");
         return -1;
     }
-    loggers[l] = (struct logger *) malloc(sizeof(struct logger));
+    loggers[l] = (struct logger *)malloc(sizeof(struct logger));
     loggers[l]->name = (char *)malloc(strlen(log_name) + 1);
     strcpy(loggers[l]->name, log_name);
     loggers[l]->fd = fd;
     return loggers[l]->fd;
 }
 
-int close_log(char *log_name){
-    for (int l = 0; l < MAX_LOGS_FILES; l++)
-    {
-        if(strcmp(log_name, loggers[l]->name) == 0){
-            if(loggers[l]->fd >= 0){
+int close_log(char *log_name)
+{
+    for (int l = 0; l < MAX_LOGS_FILES; l++) {
+        if (strcmp(log_name, loggers[l]->name) == 0) {
+            if (loggers[l]->fd >= 0) {
                 return close(loggers[l]->fd);
             }
         }
     }
 }
 
-int close_all_log(){
+int close_all_log()
+{
     debug_info("Closing all logs\n");
-    for (int l = 0; l < MAX_LOGS_FILES; l++)
-    {
-        if(loggers[l] != NULL && loggers[l]->fd >= 0){
+    for (int l = 0; l < MAX_LOGS_FILES; l++) {
+        if (loggers[l] != NULL && loggers[l]->fd >= 0) {
             close(loggers[l]->fd);
         }
     }
@@ -203,44 +191,37 @@ int close_all_log(){
 
 int why_child_exited(pid_t child, int status)
 {
-    do { 
+    do {
         if (WIFEXITED(status)) {
-            debug("[pid: %d exited] status=%d | ", 
-            child, 
-            WEXITSTATUS(status));
+            debug("[pid: %d exited] status=%d | ",
+                  child,
+                  WEXITSTATUS(status));
             return 0;
-        }
-        else if (WIFSIGNALED(status))
-        {
+        } else if (WIFSIGNALED(status)) {
             debug("[pid: %d killed by signal (%d) %s] | ",
-                    child, 
-                    WTERMSIG(status),
-                    sys_siglist[WTERMSIG(status)]);
+                  child,
+                  WTERMSIG(status),
+                  sys_siglist[WTERMSIG(status)]);
             return WTERMSIG(status);
-        }
-        else if (WIFSTOPPED(status))
-        {
-            debug("[pid: %d stopped by signal (%d) %s] | ",\
-                    child,
-                    WSTOPSIG(status),
-                    sys_siglist[WSTOPSIG(status)]);
+        } else if (WIFSTOPPED(status)) {
+            debug("[pid: %d stopped by signal (%d) %s] | ",
+                  child,
+                  WSTOPSIG(status),
+                  sys_siglist[WSTOPSIG(status)]);
             return WSTOPSIG(status);
-        }
-        else if (WIFCONTINUED(status))
-        {
+        } else if (WIFCONTINUED(status)) {
             debug("[pid: %d continued] | ", child);
         }
     } while (!WIFEXITED(status) && !WIFSIGNALED(status));
-    
+
     return 1;
 }
 
-
-static void debug_request(int id_request, char* request, int size_request)
+static void debug_request(int id_request, char *request, int size_request)
 {
     int fd = fd_log(LOG_REQUEST);
-    if(fd <= 0){
-        fprintf( stderr, "fd not found for %s", LOG_REQUEST);
+    if (fd <= 0) {
+        fprintf(stderr, "fd not found for %s", LOG_REQUEST);
         exit(-1);
     }
     char header_log[100];
@@ -249,11 +230,11 @@ static void debug_request(int id_request, char* request, int size_request)
         perror("Writting error");
 }
 
-static void debug_response(int id_response, char * response, int size_response)
+static void debug_response(int id_response, char *response, int size_response)
 {
     int fd = fd_log(LOG_RESPONSE);
-    if(fd <= 0){
-        fprintf( stderr, "fd not found for %s", LOG_RESPONSE);
+    if (fd <= 0) {
+        fprintf(stderr, "fd not found for %s", LOG_RESPONSE);
         exit(-1);
     }
     char header_log[100];
