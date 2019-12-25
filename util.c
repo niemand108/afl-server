@@ -11,6 +11,8 @@
 #define MAX_LOGS_FILES 10
 #define LOG_STDIN "./logs/sdtin"
 #define LOG_DEBUG "./logs/debug"
+#define LOG_RESPONSE "./logs/response"
+#define LOG_REQUEST "./logs/request"
 #define MAX_LINE_LOG 300
 
 int why_child_exited(pid_t, int);
@@ -167,7 +169,7 @@ int fd_log(char * log_name){
 
     int fd;
 
-    if((fd = open(log_name, O_WRONLY | O_CREAT | O_APPEND )) < 0){
+    if((fd = open(log_name, O_WRONLY | O_CREAT | O_APPEND, 0755 )) < 0){
         perror("error opening log");
         return -1;
     }
@@ -236,16 +238,26 @@ int why_child_exited(pid_t child, int status)
 
 static void debug_request(int id_request, char* request, int size_request)
 {
-    //char log[200];
-    //snprintf(log, 200, "\nREQUEST id=%d, size=%d\n", id_request, size_request);
-    //debug_to(LOG_REQUEST, "\nREQUEST id=%d, size=%d\n", id_request, size_request);
-    //debug_to(LOG_REQUEST, request);
+    int fd = fd_log(LOG_REQUEST);
+    if(fd <= 0){
+        fprintf( stderr, "fd not found for %s", LOG_REQUEST);
+        exit(-1);
+    }
+    char header_log[100];
+    snprintf(header_log, 100, "\n(id:%d, size:%d\n)", id_request, size_request);
+    if (write(fd, request, size_request) < 0)
+        perror("Writting error");
 }
 
-static void debug_response(int id_request, char * response, int size_response)
+static void debug_response(int id_response, char * response, int size_response)
 {
-    //char log[200];
-    //snprintf(log, 200, "RESPONSE id=%d, size=%d\n", id_request, size_response);
-    //debug_to(LOG_RESPONSE, "\nREQUEST id=%d, size=%d\n", id_request, size_response);
-    //debug_to(LOG_RESPONSE, "%s", response);
+    int fd = fd_log(LOG_RESPONSE);
+    if(fd <= 0){
+        fprintf( stderr, "fd not found for %s", LOG_RESPONSE);
+        exit(-1);
+    }
+    char header_log[100];
+    snprintf(header_log, 100, "\n(id:%d, size:%d\n)", id_response, size_response);
+    if (write(fd, response, size_response) < 0)
+        perror("Writting error");
 }
