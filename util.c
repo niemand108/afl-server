@@ -1,46 +1,23 @@
-#include <errno.h>
-#include <fcntl.h>
-#include <signal.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <sys/types.h>
-#include <sys/wait.h>
-#include <unistd.h>
-
-#define MAX_LOGS_FILES 10
-#define LOG_STDIN "./logs/sdtin"
-#define LOG_DEBUG "./logs/debug"
-#define LOG_RESPONSE "./logs/response"
-#define LOG_REQUEST "./logs/request"
-#define MAX_LINE_LOG 300
-
-int why_child_exited(pid_t, int);
-static void die(const char *, ...);
-static void debug(const char *, ...);
-static void vdebug(const char *, va_list);
-static void debug_info(const char *format, ...);
-static void vdebug_info(const char *format, va_list);
-
-static void debug_response(int, char *, int);
-static void debug_request(int, char *, int);
-int fd_log(char *);
-int close_log(char *);
-int close_all_log();
-int open_log(char *);
-
-const int number_signals = 16;
-int signals[number_signals] = {SIGINT, SIGHUP, SIGQUIT, SIGILL, SIGTRAP,
-                               SIGABRT, SIGBUS, SIGFPE, SIGSEGV, SIGPIPE,
-                               SIGTERM, SIGSTKFLT, SIGSTOP, SIGTSTP, SIGUSR2, SIGCHLD};
-
-struct logger
-{
-    char *name;
-    int fd;
-};
+#include "util.h"
 
 struct logger *loggers[MAX_LOGS_FILES];
+
+float percent_of_symbols(char *string)
+{
+    float total = 0, symbols = 0;
+    char *c = string;
+    if (*c == '\0')
+        return 0;
+    while (*c) {
+        total++;
+        if ((*c < 0x20 || *c > 0x7e) && *c != '\n' && *c != '\r') {
+            symbols++;
+        }
+        c++;
+    }
+
+    return (float)(symbols / total);
+}
 
 void vdebug(const char *format, va_list argp)
 {
@@ -63,7 +40,7 @@ void vdebug(const char *format, va_list argp)
     }
 }
 
-static void debug(const char *format, ...)
+void _debug(const char *format, ...)
 {
     va_list vargs;
     va_start(vargs, format);
@@ -71,7 +48,7 @@ static void debug(const char *format, ...)
     va_end(vargs);
 }
 
-static void debug_info(const char *format, ...)
+void debug_info(const char *format, ...)
 {
     va_list vargs;
     va_start(vargs, format);
@@ -79,7 +56,7 @@ static void debug_info(const char *format, ...)
     va_end(vargs);
 }
 
-static void vdebug_info(const char *format, va_list argp)
+void vdebug_info(const char *format, va_list argp)
 {
     int fd = fd_log(LOG_DEBUG);
     if (fd <= 0) {
@@ -110,7 +87,7 @@ static void vdebug_info(const char *format, va_list argp)
     }
 }
 
-static void die(const char *format, ...)
+void die(const char *format, ...)
 {
     va_list vargs;
     va_start(vargs, format);
@@ -193,31 +170,31 @@ int why_child_exited(pid_t child, int status)
 {
     do {
         if (WIFEXITED(status)) {
-            debug("[pid: %d exited] status=%d | ",
-                  child,
-                  WEXITSTATUS(status));
+            _debug("[pid: %d exited] status=%d | ",
+                   child,
+                   WEXITSTATUS(status));
             return 0;
         } else if (WIFSIGNALED(status)) {
-            debug("[pid: %d killed by signal (%d) %s] | ",
-                  child,
-                  WTERMSIG(status),
-                  sys_siglist[WTERMSIG(status)]);
+            _debug("[pid: %d killed by signal (%d) %s] | ",
+                   child,
+                   WTERMSIG(status),
+                   sys_siglist[WTERMSIG(status)]);
             return WTERMSIG(status);
         } else if (WIFSTOPPED(status)) {
-            debug("[pid: %d stopped by signal (%d) %s] | ",
-                  child,
-                  WSTOPSIG(status),
-                  sys_siglist[WSTOPSIG(status)]);
+            _debug("[pid: %d stopped by signal (%d) %s] | ",
+                   child,
+                   WSTOPSIG(status),
+                   sys_siglist[WSTOPSIG(status)]);
             return WSTOPSIG(status);
         } else if (WIFCONTINUED(status)) {
-            debug("[pid: %d continued] | ", child);
+            _debug("[pid: %d continued] | ", child);
         }
     } while (!WIFEXITED(status) && !WIFSIGNALED(status));
 
     return 1;
 }
 
-static void debug_request(int id_request, char *request, int size_request)
+void debug_request(int id_request, char *request, int size_request)
 {
     int fd = fd_log(LOG_REQUEST);
     if (fd <= 0) {
@@ -225,12 +202,22 @@ static void debug_request(int id_request, char *request, int size_request)
         exit(-1);
     }
     char header_log[100];
-    snprintf(header_log, 100, "\n(id:%d, size:%d\n)", id_request, size_request);
-    if (write(fd, request, size_request) < 0)
+    time_t t = time(NULL);
+    struct tm *tm = localtime(&t);
+    char t_s[64];
+    assert(strftime(t_s, sizeof(t_s), "[%x %X]", tm));
+    snprintf(header_log, 100, "\n(id:%d, size:%d date:%s)", id_request, size_request, t_s);
+    if (write(fd, header_log, strlen(header_log)) < 0)
         perror("Writting error");
+    char req[300];
+    snprintf(req, 300, "%s  [cut]\n\n", request);
+    if (write(fd, req, strlen(req)) < 0)
+        perror("Writting error");
+    //if (write(fd, request, size_request) < 0)
+    //    perror("Writting error");
 }
 
-static void debug_response(int id_response, char *response, int size_response)
+void debug_response(int id_response, char *response, int size_response)
 {
     int fd = fd_log(LOG_RESPONSE);
     if (fd <= 0) {
@@ -238,7 +225,54 @@ static void debug_response(int id_response, char *response, int size_response)
         exit(-1);
     }
     char header_log[100];
-    snprintf(header_log, 100, "\n(id:%d, size:%d\n)", id_response, size_response);
-    if (write(fd, response, size_response) < 0)
+    time_t t = time(NULL);
+    struct tm *tm = localtime(&t);
+    char t_s[64];
+    assert(strftime(t_s, sizeof(t_s), "[%x %X]", tm));
+    snprintf(header_log, 100, "\n(id:%d, size:%d date:%s)", id_response, size_response, t_s);
+    if (write(fd, header_log, strlen(header_log)) < 0)
         perror("Writting error");
+    char req[300];
+    snprintf(req, 300, "%s  [cut]\n\n", response);
+    if (write(fd, req, strlen(req)) < 0)
+        perror("Writting error");
+    //if (write(fd, response, size_response) < 0)
+    //    perror("Writting error");
+}
+
+void handler_others_on()
+{
+    debug_info("xxxx | Other signals ON\n");
+    for (int s = 1; s <= 62; s++) {
+        if (!is_handled(s)) {
+            struct sigaction new_action;
+            new_action.sa_handler = handle_sig_default;
+            sigemptyset(&new_action.sa_mask);
+            new_action.sa_flags = 0;
+            sigaction(s, &new_action, NULL);
+        }
+    }
+}
+
+void handler_others_off()
+{
+    debug_info("xxxx | Other signals OFF\n");
+    for (int s = 1; s <= 62; s++) {
+        if (!is_handled(s)) {
+            signal(s, SIG_DFL);
+        }
+    }
+}
+
+int is_handled(int sig)
+{
+    for (int s = 0; s < number_signals; s++)
+        if (signals[s] == sig)
+            return 1;
+    return 0;
+}
+
+void handle_sig_default(int sig, siginfo_t *si, void *ucontext)
+{
+    debug_info("HTTPD | Unhandle %s\n", sys_siglist[sig]);
 }

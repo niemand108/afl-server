@@ -1,7 +1,8 @@
-#include "util.c"
+#include "util.h"
 #include <assert.h>
 #include <errno.h>
 #include <netdb.h>
+#include <poll.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -9,15 +10,17 @@
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <sys/wait.h>
-#include <time.h>
 #include <unistd.h>
 
+#define TIMEOUT_USEC 30000
+#define LOG_STDIN "./logs/sdtin"
+#define LOG_DEBUG "./logs/debug"
+#define LOG_RESPONSE "./logs/response"
+#define LOG_REQUEST "./logs/request"
 #define MAX_SIZE_REQUEST 200000
 #define MAX_SIZE_RESPONSE 200000
 #define HOSTNAME_HTTPD 0 /* localhost */
-#define PORTNAME_HTTPD "http"
-
-pid_t fuzzer_pid = -1, server_pid = -1, connection_pid = -1;
+#define PORTNAME_HTTPD "8080"
 
 void handle_sig_fuzz(int, siginfo_t *, void *);
 void handlers_on_fuzz();
@@ -28,11 +31,9 @@ void handlers_off_server();
 void handler_connection_on();
 void handler_connection_off();
 void handle_sig_connection(int, siginfo_t *, void *);
-void handle_sig_default(int, siginfo_t *, void *);
-void handler_default_on();
-void handler_default_off();
 int send_request(char *, size_t);
-static void die(const char *format, ...);
+
+int connection_pid = -1, fuzzer_pid = -1, server_pid = -1;
 
 int send_request(char *request, size_t size_request)
 {
@@ -60,16 +61,27 @@ int send_request(char *request, size_t size_request)
             strerror(errno), res->ai_canonname, portname);
     }
 
-    debug_info("(id_req: %d) Conectando...\n", id_request);
+    fd_set set;
+    struct timeval timeout;
+
+    timeout.tv_sec = 0; //0;
+    timeout.tv_usec = TIMEOUT_USEC;
+    setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, (struct timeval *)&timeout, sizeof(struct timeval));
+    setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, (struct timeval *)&timeout, sizeof(struct timeval));
+
     if (connect(fd, res->ai_addr, res->ai_addrlen) == -1) {
+        close(fd);
         die("(id_req: %d) Socket connect: %s\n", id_request, strerror(errno));
     }
+    debug_info("(id_req: %d) Conectando...\n", id_request);
 
     int written;
-    if ((written = write(fd, request, size_request)) == -1) {
+
+    if ((written = send(fd, request, size_request, 0)) <= 0) { // write(fd, request, size_request)) == -1) {
         debug_info("(id_req: %d) write socket:  %s\n", id_request,
                    strerror(errno));
-        return -EAGAIN;
+        close(fd);
+        return -2;
     }
     assert(written == size_request);
 
@@ -86,25 +98,39 @@ int send_request(char *request, size_t size_request)
     memset(buf_r, 0, MAX_SIZE_RESPONSE + 1);
 
     debug_info("(id_req: %d) Reading response... | ", id_request);
-    // TODO: timeout read
+    int max_try = 10;
+
     for (;;) {
         if (max_resp_reads <= 0) {
+            debug_info("HTTP RESPONSE (max) [size: %d])\n", size_response);
             break;
         }
-        size_partial = read(fd, buf_r + size_response, chunk_size);
+        size_partial = recv(fd, buf_r + size_response, chunk_size, 0); // read(fd, buf_r + size_response, chunk_size);
         if (size_partial > 0) {
             max_resp_reads--;
             size_response += size_partial;
+            debug_info("response chunk %d\n", size_response);
+        } else if (size_partial == 0) {
+            if (size_response > 0) {
+                debug_info("HTTP (partial) RESPONSE [size: %d])\n", size_response);
+                break;
+            }
+            debug_info("response 0 bytes: possible crash. Trying %d/10\n", (10 - max_try));
+            if (max_try > 0) {
+                max_try--;
+            } else if (max_try <= 0) {
+                debug_info("partial response (max-tries) %d bytes: possible crash. Skipping out.\n");
+                sleep(0.1); //for caught signals
+                break;
+            }
         } else if (size_partial < 0) {
             if (errno != EINTR) {
-                debug_info("Partial response [size: %d]\n%s\n(EOF)\n",
-                           size_response, buf_r);
-                die("Error reading response [read:%d, errno: %s]\n",
-                    size_response, strerror(errno));
+                close(fd);
+                snprintf(request, 64, "timeout(size:%d, err:%s, id:%d)", size_response, strerror(errno), id_request);
+                debug_info("%s\n", request);
+                debug_response(id_request, request, strlen(request));
+                return -1;
             }
-        } else {
-            debug_info("HTTP RESPONSE [size: %d])\n", size_response);
-            break;
         }
     }
     assert(size_request < MAX_SIZE_RESPONSE);
@@ -112,44 +138,16 @@ int send_request(char *request, size_t size_request)
         size_response++;
         buf_r[size_response] = '\0';
     }
+
     debug_response(id_request, buf_r, size_response);
+
+    float p = percent_of_symbols(buf_r);
+    if (p > 0.05) {
+        debug_info("response with percent of symbols %f\n", p);
+    }
+
     close(fd);
     return size_response;
-}
-
-int is_handled(int sig)
-{
-    for (int s = 0; s < number_signals; s++)
-        if (signals[s] == sig)
-            return 1;
-    return 0;
-}
-
-void handle_sig_default(int sig, siginfo_t *si, void *ucontext)
-{
-    debug_info("Unhandle sig: %s\n", sys_siglist[sig]);
-}
-
-void handler_default_on()
-{
-    for (int s = 1; s <= 62; s++) {
-        if (!is_handled(s)) {
-            struct sigaction new_action;
-            new_action.sa_handler = handle_sig_default;
-            sigemptyset(&new_action.sa_mask);
-            new_action.sa_flags = 0;
-            sigaction(s, &new_action, NULL);
-        }
-    }
-}
-
-void handler_default_off()
-{
-    for (int s = 1; s <= 62; s++) {
-        if (!is_handled(s)) {
-            signal(s, SIG_DFL);
-        }
-    }
 }
 
 void handler_on_connection()
@@ -169,7 +167,7 @@ void handler_on_connection()
 
 void handler_off_connection()
 {
-    debug("Connection Signals OFF | ");
+    _debug("Connection Signals OFF | ");
     for (int s = 1; s <= 62; s++) {
         if (is_handled(s)) {
             signal(s, SIG_DFL);
@@ -193,7 +191,7 @@ void handlers_on_server()
 
 void handlers_off_server()
 {
-    debug("Server Signals OFF | ");
+    _debug("Server Signals OFF | ");
     for (int s = 0; s < number_signals; s++) {
         signal(signals[s], SIG_DFL);
     }
@@ -215,7 +213,7 @@ void handlers_on_fuzz()
 
 void handlers_off_fuzz()
 {
-    debug("Signals Fuzzer OFF | ");
+    _debug("Signals Fuzzer OFF | ");
     for (int s = 0; s < number_signals; s++) {
         signal(signals[s], SIG_DFL);
     }
@@ -237,17 +235,18 @@ void handle_sig_server(int sig, siginfo_t *si, void *ucontext)
 
             int signal_chld = why_child_exited(chld, status);
             if (signal_chld == 0) {
-                debug("Child %d exit OK, raising SIGINT to this process\n",
-                      chld);
+                _debug("Child %d exit OK, raising SIGINT to this process(SERVER)\n",
+                       chld);
                 raise(SIGINT);
                 return;
             }
 
-            debug("Raising child signal to this process\n");
-            raise(signal_chld);
+            _debug("Sending signal %d to this process(SERVER)", signal_chld);
+            handlers_on_server();
+            kill(getpid(), signal_chld);
             return;
         } else {
-            debug("Sending/Raising signal to everyone\n");
+            _debug("Sending/Raising signal to everyone (%d, %d, %d)\n", fuzzer_pid, getpid(), connection_pid);
             if (connection_pid != -1)
                 kill(connection_pid, sig);
             kill(fuzzer_pid, sig);
@@ -263,22 +262,22 @@ void handle_sig_server(int sig, siginfo_t *si, void *ucontext)
             sv.sival_int = 0xD1E;
 
         if (connection_pid != -1) {
-            debug("Queueing %s to %d because SIGUSR2", sys_siglist[SIGINT],
-                  connection_pid);
+            _debug("Queueing %s to %d because SIGUSR2", sys_siglist[SIGINT],
+                   connection_pid);
             sigqueue(connection_pid, SIGINT, sv);
         }
 
-        debug("Queueing %s to %d because SIGUSR2", sys_siglist[sig],
-              sys_siglist[SIGINT], getpid());
+        _debug("Queueing %s to %d because SIGUSR2", sys_siglist[sig],
+               sys_siglist[SIGINT], getpid());
         sigqueue(getpid(), SIGINT, sv); // TODO podrian ser equivalentes
 
-        debug("Queueing %s to %d because SIGUSR2", sys_siglist[sig],
-              sys_siglist[SIGINT], server_pid);
+        _debug("Queueing %s to %d because SIGUSR2", sys_siglist[sig],
+               sys_siglist[SIGINT], server_pid);
 
         sigqueue(server_pid, SIGUSR2, sv); // TODO podrian ser equivalentes
     }
 
-    debug(" | End\n");
+    _debug(" | End\n");
 }
 
 void handle_sig_fuzz(int sig, siginfo_t *si, void *ucontext)
@@ -298,23 +297,23 @@ void handle_sig_fuzz(int sig, siginfo_t *si, void *ucontext)
             int signal_chld = why_child_exited(chld, status);
 
             if (signal_chld == 0) {
-                debug("Child %d exit OK, raising SIGCONT to this process\n",
-                      chld);
-                raise(SIGCONT);
+                _debug("Child %d exit OK, raising SIGCONT to this process (FUZZ)\n",
+                       chld);
+                //raise(SIGCONT);
+                handlers_on_fuzz();
                 return;
             }
 
-            debug("Raising SIG signal to this process");
-            debug("... & Closing logs\n ");
-            close_all_log();
+            _debug("Raising signal %d to this process(FUZZ)\n", signal_chld);
+            handlers_on_fuzz();
             raise(signal_chld);
             return;
         } else {
-            debug("Sending/Raising signal to everyone\n");
+            _debug("Sending/Raising signal to everyone(%d, %d, %d)\n", fuzzer_pid, server_pid, connection_pid);
             if (connection_pid != -1)
                 kill(connection_pid, sig);
             kill(server_pid, sig);
-            close_all_log();
+            //close_all_log();
             raise(sig);
             return;
         }
@@ -327,27 +326,27 @@ void handle_sig_fuzz(int sig, siginfo_t *si, void *ucontext)
             sv.sival_int = 0xD1E;
 
         if (connection_pid != -1) {
-            debug("Queueing %s to %d because SIGUSR2", sys_siglist[SIGINT],
-                  connection_pid);
+            _debug("Queueing %s to %d because SIGUSR2", sys_siglist[SIGINT],
+                   connection_pid);
             sigqueue(connection_pid, SIGINT, sv);
         }
 
-        debug("Queueing %s to %d because SIGUSR2", sys_siglist[sig],
-              sys_siglist[SIGINT], getpid());
+        _debug("Queueing %s to %d because SIGUSR2", sys_siglist[sig],
+               sys_siglist[SIGINT], getpid());
         sigqueue(getpid(), SIGINT, sv); // TODO podrian ser equivalentes
 
-        debug("Queueing %s to %d because SIGUSR2", sys_siglist[sig],
-              sys_siglist[SIGINT], server_pid);
+        _debug("Queueing %s to %d because SIGUSR2", sys_siglist[sig],
+               sys_siglist[SIGINT], server_pid);
 
         sigqueue(server_pid, SIGUSR2, sv); // TODO podrian ser equivalentes
     }
 
-    debug(" | End\n");
+    _debug(" | End\n");
 }
 
 void handle_sig_connection(int sig, siginfo_t *si, void *ucontext)
 {
-    debug_info("Fuzzer | Handling signal --%s-- (%d) | ", sys_siglist[sig],
+    debug_info("CONN | Handling signal --%s-- (%d) | ", sys_siglist[sig],
                getpid());
     handler_off_connection();
 
@@ -362,16 +361,18 @@ void handle_sig_connection(int sig, siginfo_t *si, void *ucontext)
             int signal_chld = why_child_exited(chld, status);
 
             if (signal_chld == 0) {
-                debug("Child %d exit OK, raising SIGINT to this process", chld);
+                _debug("Child %d exit OK, raising SIGINT to this proces (CONN)\n", chld);
                 raise(SIGINT);
                 return;
             }
 
-            debug("Raising child signal to this process");
-            raise(signal_chld);
+            _debug("Sending singal %s to this process(CONN)\n", signal_chld);
+            handler_on_connection();
+            kill(getpid, signal_chld);
+
             return;
         } else {
-            debug("Sending/Raising signal to everyone");
+            _debug("Sending/Raising signal to everyone(%d, %d, %d)\n", fuzzer_pid, server_pid, getpid());
             if (connection_pid != -1)
                 kill(connection_pid, sig);
             kill(server_pid, sig);
@@ -387,22 +388,22 @@ void handle_sig_connection(int sig, siginfo_t *si, void *ucontext)
             sv.sival_int = 0xD1E;
 
         if (connection_pid != -1) {
-            debug("Queueing %s to %d because SIGUSR2", sys_siglist[SIGINT],
-                  connection_pid);
+            _debug("Queueing %s to %d because SIGUSR2", sys_siglist[SIGINT],
+                   connection_pid);
             sigqueue(connection_pid, SIGINT, sv);
         }
 
-        debug("Queueing %s to %d because SIGUSR2", sys_siglist[sig],
-              sys_siglist[SIGINT], getpid());
+        _debug("Queueing %s to %d because SIGUSR2", sys_siglist[sig],
+               sys_siglist[SIGINT], getpid());
         sigqueue(getpid(), SIGINT, sv); // TODO podrian ser equivalentes
 
-        debug("Queueing %s to %d because SIGUSR2", sys_siglist[sig],
-              sys_siglist[SIGINT], server_pid);
+        _debug("Queueing %s to %d because SIGUSR2", sys_siglist[sig],
+               sys_siglist[SIGINT], server_pid);
 
         sigqueue(server_pid, SIGUSR2, sv); // TODO podrian ser equivalentes
     }
 
-    debug("| End\n");
+    _debug("| End\n");
 }
 
 int main(int argc, char **argv)
@@ -414,7 +415,7 @@ int main(int argc, char **argv)
     open_log(LOG_RESPONSE);
 
     fuzzer_pid = getpid();
-    handler_default_on();
+    handler_others_on();
     debug_info("Write something:\n");
 
     if ((server_pid = fork()) != 0) // PARENT: fuzzer
@@ -423,7 +424,8 @@ int main(int argc, char **argv)
 
         handlers_on_fuzz();
         int loop = 0;
-        while (__AFL_LOOP(10000)) {
+        while (__AFL_LOOP(1000000)) {
+            //while (1) {
             loop++;
             char buf[MAX_SIZE_REQUEST + 1];
             const int chunk_size = 1000;
@@ -443,68 +445,77 @@ int main(int argc, char **argv)
                     size_request += size_partial;
                 } else if (size_partial < 0) {
                     if (errno != EINTR) {
-                        buf[size_request + 1] = '\0';
+                        //buf[size_request + 1] = '\0';
                         debug_info("(loop:%d) STDIN ERROR (%s)\n", loop,
                                    strerror(errno));
                         die("Error reading request [read:%d, errno: %s]\n",
                             size_request, strerror(errno));
                     }
                 } else {
-                    buf[size_request + 1] = '\0';
+                    //buf[size_request + 1] = '\0';
                     debug_info("(loop:%d) REQUEST [size: %d]\n", loop,
                                size_request);
                     break;
                 }
             }
-            if (size_request + 5 < MAX_SIZE_REQUEST) {
-                buf[size_request + 1] = '\r';
-                buf[size_request + 2] = '\n';
-                buf[size_request + 3] = '\r';
-                buf[size_request + 4] = '\n';
-                buf[size_request + 5] = '\0';
-                size_request += 5;
+            if (size_request + 7 < MAX_SIZE_REQUEST) {
+                buf[size_request] = '\r';
+                buf[size_request + 1] = '\n';
+                buf[size_request + 2] = '\r';
+                buf[size_request + 3] = '\n';
+                buf[size_request + 4] = '\r';
+                buf[size_request + 5] = '\n';
+                buf[size_request + 6] = '\0';
+                size_request += 7;
             } else {
                 debug_info("(loop:%d) MAX_SIZE_REQUEST\n", loop);
-                buf[MAX_SIZE_REQUEST - 5] = '\r';
-                buf[MAX_SIZE_REQUEST - 4] = '\n';
-                buf[MAX_SIZE_REQUEST - 3] = '\r';
-                buf[MAX_SIZE_REQUEST - 2] = '\n';
-                buf[MAX_SIZE_REQUEST - 1] = '\0';
+                buf[size_request - 6] = '\r';
+                buf[size_request - 5] = '\n';
+                buf[MAX_SIZE_REQUEST - 4] = '\r';
+                buf[MAX_SIZE_REQUEST - 3] = '\n';
+                buf[MAX_SIZE_REQUEST - 2] = '\r';
+                buf[MAX_SIZE_REQUEST - 1] = '\n';
+                buf[MAX_SIZE_REQUEST - 0] = '\0';
                 size_request = MAX_SIZE_REQUEST;
             }
 
             debug_info("(loop:%d) sending... (size: %d)\n", loop, size_request);
             int s_r = send_request(buf, size_request);
             if (s_r < 0)
-                debug_info("(loop:%d) sending error:%d\n", s_r);
+                debug_info("(loop:%d) sending error:%d\n", loop, s_r);
         }
 
         debug_info("(loop:%d) | Final Loop\n", loop);
         kill(server_pid, SIGINT);
+        sleep(1);
         close_all_log();
         return 0;
     } else // CHILD: HTTP SERVER
     {
         server_pid = getpid(); // remove
-        handlers_on_server();
         int status = 0;
         if ((connection_pid = fork()) == 0) {
-            connection_pid = getpid(); // remove
-            if (execve("./httpd", NULL, NULL) < 0) {
+            connection_pid = getpid();
+            debug_info("Calling mini_httpd with args: ");
+            for (int c = 0; c < argc; c++) {
+                _debug("%s ", argv[c]);
+            }
+            _debug("\n");
+            indirect_main(argc, argv);
+            /*if (execve("./httpd", NULL, NULL) < 0) {
                 perror("error");
             }
-
+            */
         } else {
-            handler_on_connection();
+            handlers_on_server();
+
+            //handler_on_connection();
 
             while (1) {
-                sleep(2);
-                debug_info(
-                    "Server-Fork | Sleeping & waiting to signal to be "
-                    "handled\n");
+                debug_info("Server-Fork | Sleeping\n");
+                if (sleep(1000) != 0)
+                    debug_info("Server-Fork | waken from sleep for handling a signal\n");
             }
-            debug_info("Server-Fork | everybody done\n");
-
             return 0;
         }
     }
