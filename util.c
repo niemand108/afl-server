@@ -209,12 +209,12 @@ void debug_request(int id_request, char *request, int size_request)
     snprintf(header_log, 100, "\n(id:%d, size:%d date:%s)", id_request, size_request, t_s);
     if (write(fd, header_log, strlen(header_log)) < 0)
         perror("Writting error");
-    char req[300];
-    snprintf(req, 300, "%s  [cut]\n\n", request);
-    if (write(fd, req, strlen(req)) < 0)
-        perror("Writting error");
-    //if (write(fd, request, size_request) < 0)
+    //char req[300];
+    //snprintf(req, 300, "\n\n%s  [cut]\n\n", request);
+    //if (write(fd, req, strlen(req)) < 0)
     //    perror("Writting error");
+    if (write(fd, request, size_request) < 0)
+        perror("Writting error");
 }
 
 void debug_response(int id_response, char *response, int size_response)
@@ -232,12 +232,20 @@ void debug_response(int id_response, char *response, int size_response)
     snprintf(header_log, 100, "\n(id:%d, size:%d date:%s)", id_response, size_response, t_s);
     if (write(fd, header_log, strlen(header_log)) < 0)
         perror("Writting error");
-    char req[300];
-    snprintf(req, 300, "%s  [cut]\n\n", response);
-    if (write(fd, req, strlen(req)) < 0)
-        perror("Writting error");
-    //if (write(fd, response, size_response) < 0)
+
+    //char req[300];
+    //snprintf(req, 300, "\n\n%s  [cut]\n\n", response);
+    //if (write(fd, req, strlen(req)) < 0)
     //    perror("Writting error");
+    if (size_response == 0) {
+        char sizezero[100];
+        snprintf(sizezero, 100, "SIZEZERO (timeout?)\n\n", response);
+        if (write(fd, sizezero, strlen(sizezero)) < 0)
+            perror("Writting error");
+    } else {
+        if (write(fd, response, size_response) < 0)
+            perror("Writting error");
+    }
 }
 
 void handler_others_on()

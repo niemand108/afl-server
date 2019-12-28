@@ -1,26 +1,17 @@
+#include "requestlib.h"
 #include "util.h"
 #include <assert.h>
 #include <errno.h>
-#include <netdb.h>
-#include <poll.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/socket.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
 
-#define TIMEOUT_USEC 30000
 #define LOG_STDIN "./logs/sdtin"
 #define LOG_DEBUG "./logs/debug"
-#define LOG_RESPONSE "./logs/response"
-#define LOG_REQUEST "./logs/request"
-#define MAX_SIZE_REQUEST 200000
-#define MAX_SIZE_RESPONSE 200000
-#define HOSTNAME_HTTPD 0 /* localhost */
-#define PORTNAME_HTTPD "8080"
 
 void handle_sig_fuzz(int, siginfo_t *, void *);
 void handlers_on_fuzz();
@@ -31,124 +22,8 @@ void handlers_off_server();
 void handler_connection_on();
 void handler_connection_off();
 void handle_sig_connection(int, siginfo_t *, void *);
-int send_request(char *, size_t);
 
 int connection_pid = -1, fuzzer_pid = -1, server_pid = -1;
-
-int send_request(char *request, size_t size_request)
-{
-    const char *hostname = HOSTNAME_HTTPD;
-    const char *portname = PORTNAME_HTTPD;
-    struct addrinfo hints;
-    int id_request = rand();
-
-    memset(&hints, 0, sizeof(hints));
-    hints.ai_family = AF_UNSPEC;
-    hints.ai_socktype = SOCK_STREAM;
-    hints.ai_protocol = 0;
-    hints.ai_flags = AI_ADDRCONFIG;
-    struct addrinfo *res = 0;
-
-    int err = getaddrinfo(hostname, portname, &hints, &res);
-    if (err != 0) {
-        die("(id_req: %d) Failed to resolve remote socket address (err=%d)\n",
-            id_request, err);
-    }
-
-    int fd = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
-    if (fd == -1) {
-        die("(id_req: %d) Socket: %s name: %s port:%d\n", id_request,
-            strerror(errno), res->ai_canonname, portname);
-    }
-
-    fd_set set;
-    struct timeval timeout;
-
-    timeout.tv_sec = 0; //0;
-    timeout.tv_usec = TIMEOUT_USEC;
-    setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, (struct timeval *)&timeout, sizeof(struct timeval));
-    setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, (struct timeval *)&timeout, sizeof(struct timeval));
-
-    if (connect(fd, res->ai_addr, res->ai_addrlen) == -1) {
-        close(fd);
-        die("(id_req: %d) Socket connect: %s\n", id_request, strerror(errno));
-    }
-    debug_info("(id_req: %d) Conectando...\n", id_request);
-
-    int written;
-
-    if ((written = send(fd, request, size_request, 0)) <= 0) { // write(fd, request, size_request)) == -1) {
-        debug_info("(id_req: %d) write socket:  %s\n", id_request,
-                   strerror(errno));
-        close(fd);
-        return -2;
-    }
-    assert(written == size_request);
-
-    debug_info("(id_req: %d) HTTP REQUEST DONE [written:%d size_request:%d]\n",
-               id_request, written, size_request);
-    debug_request(id_request, request, size_request);
-
-    freeaddrinfo(res);
-
-    ssize_t size_response = 0, size_partial;
-    int chunk_size = 1000;
-    int max_resp_reads = MAX_SIZE_RESPONSE / chunk_size;
-    char buf_r[MAX_SIZE_RESPONSE + 1];
-    memset(buf_r, 0, MAX_SIZE_RESPONSE + 1);
-
-    debug_info("(id_req: %d) Reading response... | ", id_request);
-    int max_try = 10;
-
-    for (;;) {
-        if (max_resp_reads <= 0) {
-            debug_info("HTTP RESPONSE (max) [size: %d])\n", size_response);
-            break;
-        }
-        size_partial = recv(fd, buf_r + size_response, chunk_size, 0); // read(fd, buf_r + size_response, chunk_size);
-        if (size_partial > 0) {
-            max_resp_reads--;
-            size_response += size_partial;
-            debug_info("response chunk %d\n", size_response);
-        } else if (size_partial == 0) {
-            if (size_response > 0) {
-                debug_info("HTTP (partial) RESPONSE [size: %d])\n", size_response);
-                break;
-            }
-            debug_info("response 0 bytes: possible crash. Trying %d/10\n", (10 - max_try));
-            if (max_try > 0) {
-                max_try--;
-            } else if (max_try <= 0) {
-                debug_info("partial response (max-tries) %d bytes: possible crash. Skipping out.\n");
-                sleep(0.1); //for caught signals
-                break;
-            }
-        } else if (size_partial < 0) {
-            if (errno != EINTR) {
-                close(fd);
-                snprintf(request, 64, "timeout(size:%d, err:%s, id:%d)", size_response, strerror(errno), id_request);
-                debug_info("%s\n", request);
-                debug_response(id_request, request, strlen(request));
-                return -1;
-            }
-        }
-    }
-    assert(size_request < MAX_SIZE_RESPONSE);
-    if (buf_r[size_response] != '\0') {
-        size_response++;
-        buf_r[size_response] = '\0';
-    }
-
-    debug_response(id_request, buf_r, size_response);
-
-    float p = percent_of_symbols(buf_r);
-    if (p > 0.05) {
-        debug_info("response with percent of symbols %f\n", p);
-    }
-
-    close(fd);
-    return size_response;
-}
 
 void handler_on_connection()
 {
@@ -440,8 +315,8 @@ int main(int argc, char **argv)
                 max_reads--;
                 size_partial = read(0, buf + size_request, chunk_size);
                 if (size_partial > 0) {
-                    debug_info("(loop:%d) Reading chunk...%d\n", loop,
-                               chunk_size);
+                    //TODO debug_info("(loop:%d) Reading chunk...%d\n", loop,
+                    //          chunk_size);
                     size_request += size_partial;
                 } else if (size_partial < 0) {
                     if (errno != EINTR) {
@@ -453,8 +328,8 @@ int main(int argc, char **argv)
                     }
                 } else {
                     //buf[size_request + 1] = '\0';
-                    debug_info("(loop:%d) REQUEST [size: %d]\n", loop,
-                               size_request);
+                    //debug_info("(loop:%d) REQUEST [size: %d]\n", loop,
+                    //           size_request);
                     break;
                 }
             }
@@ -480,7 +355,8 @@ int main(int argc, char **argv)
             }
 
             debug_info("(loop:%d) sending... (size: %d)\n", loop, size_request);
-            int s_r = send_request(buf, size_request);
+            //int s_r = send_request(buf, size_request);
+            int s_r = send_request_stochastic(buf, size_request);
             if (s_r < 0)
                 debug_info("(loop:%d) sending error:%d\n", loop, s_r);
         }
@@ -497,8 +373,8 @@ int main(int argc, char **argv)
         if ((connection_pid = fork()) == 0) {
             connection_pid = getpid();
             debug_info("Calling mini_httpd with args: ");
-            for (int c = 0; c < argc; c++) {
-                _debug("%s ", argv[c]);
+            for (int c = 1; c < argc; c++) {
+                _debug("arg[%d]=%s ", c, argv[c]);
             }
             _debug("\n");
             indirect_main(argc, argv);
