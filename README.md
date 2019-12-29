@@ -1,7 +1,9 @@
 # afl-server
 
-Basic AFL structure for a server (mini_httpd)
-=============================================
+This project builds the basic structure to debug the server moder (make a request/ wait for response). In this case, as example, automatically downloads an http server ([mini_httpd](https://acme.com/software/mini_httpd/)) that will be patch to support the AFL fuzzer.
+
+Basic AFL structure for a server 
+=================================
 ```
 +----------------+                +----------------+
 |                |                |                |              +-------------------+
@@ -23,7 +25,7 @@ Basic AFL structure for a server (mini_httpd)
 Requeriments 
 ============
 
-It's necessary the compiler afl-clang-fast (llvm-mode). 
+It's necessary the compiler [afl-clang-fast (llvm-mode)](https://github.com/google/AFL/tree/master/llvm_mode).
 
 
 Make
