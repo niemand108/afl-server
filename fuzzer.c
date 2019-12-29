@@ -106,14 +106,12 @@ int main(int argc, char **argv)
         pid_t connection_pid = fork();
         if (connection_pid == 0) {
             set_fuzz_conn_pid(getpid());
-
+#ifdef MINI_HTTPD_
             _debug_info("Calling mini_httpd with args: ");
             for (int c = 1; c < argc; c++) {
                 _debug("arg[%d]=%s ", c, argv[c]);
             }
             _debug("\n");
-
-#ifdef MINI_HTTPD_
             indirect_main(argc, argv);
 #else
             if (execve("./httpd", NULL, NULL) < 0) {
