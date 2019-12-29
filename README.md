@@ -34,11 +34,12 @@ $ make
 Running AFL fuzzer
 ==================
 
-1. Create fuzzing directories:
+1. Create the fuzzing directories:
 mkdir -p fuzz/
 mkdir -p in
 
 2. Create a sample:
+```
 cat <<EOT >> in/test1
 GET / HTTP/1.1
 Host: localhost
@@ -47,7 +48,7 @@ Accept: */*
 
 
 EOT
-
+```
 3. Launch the AFL fuzzer:
 afl-fuzz -t 5000 -i in/ -o fuzz/ ./fuzzer -p 8080 -u yourlinuxuser -D
 
