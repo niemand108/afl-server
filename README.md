@@ -23,7 +23,7 @@ Basic AFL structure for a server
 Requeriments 
 ============
 
-It's necessary to have socat installed and afl-clang-fast (llvm-mode)
+It's necessary the compiler afl-clang-fast (llvm-mode)
 
 Make
 ====

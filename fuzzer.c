@@ -113,12 +113,13 @@ int main(int argc, char **argv)
             }
             _debug("\n");
 
+#ifdef MINI_HTTPD_
             indirect_main(argc, argv);
-
-            /*if (execve("./httpd", NULL, NULL) < 0) {
+#else
+            if (execve("./httpd", NULL, NULL) < 0) {
                 perror("error");
             }
-            */
+#endif
         } else {
             handlers_on_server();
 
