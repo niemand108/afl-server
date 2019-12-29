@@ -25,7 +25,7 @@ Basic AFL structure for a server
 Requeriments 
 ============
 
-It's necessary the compiler [afl-clang-fast (llvm-mode)](https://github.com/google/AFL/tree/master/llvm_mode).
+It's necessary the [afl-clang-fast (llvm-mode)](https://github.com/google/AFL/tree/master/llvm_mode) compiler.
 
 
 Make
