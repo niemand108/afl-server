@@ -1,0 +1,58 @@
+--- mini_httpd-1.30/mini_httpd.c	2018-10-26 21:47:50.000000000 +0200
++++ mini_httpd-1.30-patch/mini_httpd.c	2019-12-29 19:38:27.507326927 +0100
+@@ -27,7 +27,7 @@
+ 
+ 
+ #include "version.h"
+-
++#include "../lib/httpdsig.h"
+ #include <unistd.h>
+ #include <stdlib.h>
+ #include <stdarg.h>
+@@ -317,8 +317,12 @@
+ 
+ 
+ int
+-main( int argc, char** argv )
++indirect_main( int argc, char** argv )
+     {
++    set_server_pid(getpid());
++    _debug_info("I'm mini_httpd %d\n", getpid());
++    handlers_httpd_on();
++    handler_others_on();
+     int argn;
+     struct passwd* pwd;
+     uid_t uid = 32767;
+@@ -752,19 +756,21 @@
+ 
+     /* Catch various signals. */
+ #ifdef HAVE_SIGSET
+-    (void) sigset( SIGTERM, handle_sigterm );
++/*    (void) sigset( SIGTERM, handle_sigterm );
+     (void) sigset( SIGINT, handle_sigterm );
+     (void) sigset( SIGUSR1, handle_sigterm );
+     (void) sigset( SIGHUP, handle_sighup );
+     (void) sigset( SIGCHLD, handle_sigchld );
+     (void) sigset( SIGPIPE, SIG_IGN );
++*/
+ #else /* HAVE_SIGSET */
+-    (void) signal( SIGTERM, handle_sigterm );
++/*    (void) signal( SIGTERM, handle_sigterm );
+     (void) signal( SIGINT, handle_sigterm );
+     (void) signal( SIGUSR1, handle_sigterm );
+     (void) signal( SIGHUP, handle_sighup );
+     (void) signal( SIGCHLD, handle_sigchld );
+     (void) signal( SIGPIPE, SIG_IGN );
++*/
+ #endif /* HAVE_SIGSET */
+     got_hup = 0;
+ 
+@@ -857,6 +863,8 @@
+ 	if ( r == 0 )
+ 	    {
+ 	    /* Child process. */
++	    set_conn_pid(getpid());
++            handlers_httpd_off();
+ 	    client_addr = usa;
+ 	    if ( listen4_fd != -1 )
+ 		(void) close( listen4_fd );
