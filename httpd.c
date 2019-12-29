@@ -1,4 +1,4 @@
-#include "httpdsig.h"
+#include "lib/httpdsig.h"
 #include <errno.h>
 #include <netdb.h>
 #include <signal.h>
@@ -25,9 +25,9 @@ int main(int argc, char **argv)
     {
         set_conn_pid(chld);
         while (1) {
-            debug_info("HTTPD-Fork | Sleeping\n");
+            _debug_info("HTTPD-Fork | Sleeping\n");
             if (sleep(1000) != 0)
-                debug_info("HTTPD-Fork | waken from sleep for handling a signal\n");
+                _debug_info("HTTPD-Fork | waken from sleep for handling a signal\n");
         }
     }
     return 0;

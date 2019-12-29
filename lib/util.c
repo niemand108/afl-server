@@ -40,7 +40,7 @@ void vdebug(const char *format, va_list argp)
     }
 }
 
-void _debug(const char *format, ...)
+void __debug(const char *format, ...)
 {
     va_list vargs;
     va_start(vargs, format);
@@ -48,7 +48,7 @@ void _debug(const char *format, ...)
     va_end(vargs);
 }
 
-void debug_info(const char *format, ...)
+void __debug_info(const char *format, ...)
 {
     va_list vargs;
     va_start(vargs, format);
@@ -158,7 +158,7 @@ int close_log(char *log_name)
 
 int close_all_log()
 {
-    debug_info("Closing all logs\n");
+    _debug_info("Closing all logs\n");
     for (int l = 0; l < MAX_LOGS_FILES; l++) {
         if (loggers[l] != NULL && loggers[l]->fd >= 0) {
             close(loggers[l]->fd);
@@ -194,7 +194,7 @@ int why_child_exited(pid_t child, int status)
     return 1;
 }
 
-void debug_request(int id_request, char *request, int size_request)
+void __debug_request(int id_request, char *request, int size_request)
 {
     int fd = fd_log(LOG_REQUEST);
     if (fd <= 0) {
@@ -217,7 +217,7 @@ void debug_request(int id_request, char *request, int size_request)
         perror("Writting error");
 }
 
-void debug_response(int id_response, char *response, int size_response)
+void __debug_response(int id_response, char *response, int size_response)
 {
     int fd = fd_log(LOG_RESPONSE);
     if (fd <= 0) {
@@ -250,7 +250,7 @@ void debug_response(int id_response, char *response, int size_response)
 
 void handler_others_on()
 {
-    debug_info("xxxx | Other signals ON\n");
+    _debug_info("xxxx | Other signals ON\n");
     for (int s = 1; s <= 62; s++) {
         if (!is_handled(s)) {
             struct sigaction new_action;
@@ -264,7 +264,7 @@ void handler_others_on()
 
 void handler_others_off()
 {
-    debug_info("xxxx | Other signals OFF\n");
+    _debug_info("xxxx | Other signals OFF\n");
     for (int s = 1; s <= 62; s++) {
         if (!is_handled(s)) {
             signal(s, SIG_DFL);
@@ -282,5 +282,5 @@ int is_handled(int sig)
 
 void handle_sig_default(int sig, siginfo_t *si, void *ucontext)
 {
-    debug_info("HTTPD | Unhandle %s\n", sys_siglist[sig]);
+    _debug_info("HTTPD | Unhandle %s\n", sys_siglist[sig]);
 }

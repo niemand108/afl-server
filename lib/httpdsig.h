@@ -1,6 +1,7 @@
 #ifndef _HTTPDSIGLIB_H_
 #define _HTTPDSIGLIB_H_
 
+#include "util.h"
 #include <errno.h>
 #include <netdb.h>
 #include <signal.h>

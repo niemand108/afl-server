@@ -18,14 +18,40 @@
 #define LOG_REQUEST "./logs/request"
 #define MAX_LINE_LOG 300
 
+#ifndef DEBUG_ON
+#define DEBUG_ON 0
+#endif
+
+#define _debug(fmt, ...)                 \
+    do {                                 \
+        if (DEBUG_ON)                    \
+            __debug(fmt, ##__VA_ARGS__); \
+    } while (0)
+#define _debug_info(fmt, ...)                 \
+    do {                                      \
+        if (DEBUG_ON)                         \
+            __debug_info(fmt, ##__VA_ARGS__); \
+    } while (0)
+#define _debug_request(id_request, request, size_request)       \
+    do {                                                        \
+        if (DEBUG_ON)                                           \
+            __debug_request(id_request, request, size_request); \
+    } while (0)
+
+#define _debug_response(id_request, response, size_response)       \
+    do {                                                           \
+        if (DEBUG_ON)                                              \
+            __debug_response(id_request, response, size_response); \
+    } while (0)
+
 extern int why_child_exited(pid_t, int);
 extern void die(const char *, ...);
-extern void _debug(const char *, ...);
+extern void __debug(const char *, ...);
 extern void vdebug(const char *, va_list);
-extern void debug_info(const char *format, ...);
+extern void __debug_info(const char *format, ...);
 extern void vdebug_info(const char *format, va_list);
-extern void debug_response(int, char *, int);
-extern void debug_request(int, char *, int);
+extern void __debug_response(int, char *, int);
+extern void __debug_request(int, char *, int);
 extern int fd_log(char *);
 extern int close_log(char *);
 extern int close_all_log();

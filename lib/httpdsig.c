@@ -1,5 +1,4 @@
 #include "httpdsig.h"
-#include "util.h"
 
 void set_server_pid(pid_t pid)
 {
@@ -29,7 +28,7 @@ void debug_httpd(const char *format, ...)
 
 void handlers_httpd_on()
 {
-    debug_info("HTTPD Signals ON\n");
+    _debug_info("HTTPD Signals ON\n");
     struct sigaction new_action;
     new_action.sa_handler = handle_sig;
     sigemptyset(&new_action.sa_mask);
@@ -50,8 +49,8 @@ void handlers_httpd_off()
 
 void handle_sig(int sig, siginfo_t *si, void *ucontext)
 {
-    debug_info("HTTPD | Handling signal --%s-- (%d) | ",
-               sys_siglist[sig], getpid());
+    _debug_info("HTTPD | Handling signal --%s-- (%d) | ",
+                sys_siglist[sig], getpid());
 
     handlers_httpd_off();
 
@@ -64,7 +63,7 @@ void handle_sig(int sig, siginfo_t *si, void *ucontext)
 
         int signal_child = why_child_exited(chld, status);
         if (signal_child == 0) {
-            debug_info("Child exit OK, raising SIGCONT to this process(HTTPD)");
+            _debug_info("Child exit OK, raising SIGCONT to this process(HTTPD)");
             handlers_httpd_on();
             _debug("\n");
             //raise(SIGCONT);

@@ -15,13 +15,15 @@
 #define PORTNAME_HTTPD "8080"
 #define TIMEOUT_USEC_MAX 30000
 #define TIMEOUT_USEC_MIN 5000
+#define MAX_CHUNK_RESPONSE 100
+#define MAX_CHUNK_REQUEST 100
 #define LOG_DEBUG "./logs/debug"
 
 extern int send_request(char *, size_t);
 extern int send_request_stochastic(char *, size_t);
 int send_request_chunk(int, int, int, char *, int);
-int recv_response_chunk(int, int, int, char *, int);
+int recv_response_chunk(int, int, int, char *); //, int);
 int random_in_range(int, int);
 void set_timeout(int, int);
-
+void sleeping();
 #endif
