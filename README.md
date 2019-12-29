@@ -1,6 +1,6 @@
 # afl-server
 
-This project builds the basic structure to debug the server moder (make a request/ wait for response). In this case, as example, automatically downloads an http server ([mini_httpd](https://acme.com/software/mini_httpd/)) that will be patch to support the AFL fuzzer.
+This project builds the basic structure to debug the server model (make a request/ wait for response). In this case, as example, automatically downloads a http server ([mini_httpd](https://acme.com/software/mini_httpd/)) that will be patch to support the AFL fuzzer.
 
 Basic AFL structure for a server 
 =================================
