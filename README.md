@@ -29,15 +29,16 @@ It's necessary the compiler afl-clang-fast (llvm-mode).
 Make
 ====
 
-$ make 
+```$ make ```
 
 Running AFL fuzzer
 ==================
 
 1. Create the fuzzing directories:
+```
 mkdir -p fuzz/
 mkdir -p in
-
+```
 2. Create a sample:
 ```
 cat <<EOT >> in/test1
@@ -50,7 +51,7 @@ Accept: */*
 EOT
 ```
 3. Launch the AFL fuzzer:
-afl-fuzz -t 5000 -i in/ -o fuzz/ ./fuzzer -p 8080 -u yourlinuxuser -D
+```afl-fuzz -t 5000 -i in/ -o fuzz/ ./fuzzer -p 8080 -u yourlinuxuser -D```
 
 Logs
 ====
