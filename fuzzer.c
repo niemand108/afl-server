@@ -23,6 +23,7 @@ int main(int argc, char **argv)
 
     set_fuzz_fuzzer_pid(getpid());
     handler_others_on();
+
     _debug_info("Write something:\n");
 
     pid_t server_pid = fork();
@@ -33,20 +34,24 @@ int main(int argc, char **argv)
 
         handlers_on_fuzz();
         int loop = 0;
+        //while (1) {
         while (__AFL_LOOP(1000000)) {
-            //while (1) {
+
             loop++;
+
             char buf[MAX_SIZE_REQUEST + 1];
-            const int chunk_size = 1000;
-            int max_reads = MAX_SIZE_REQUEST / chunk_size;
+            int chunk_size = 1000;
             ssize_t size_request = 0, size_partial;
+
             memset(buf, 0, MAX_SIZE_REQUEST);
 
             _debug_info("(loop:%d) Reading stdin...\n", loop);
+
             for (;;) {
-                if (max_reads <= 0)
+                if (size_request >= MAX_SIZE_REQUEST)
                     break;
-                max_reads--;
+                if (size_request + chunk_size >= MAX_SIZE_REQUEST)
+                    chunk_size = MAX_SIZE_REQUEST - size_request;
                 size_partial = read(0, buf + size_request, chunk_size);
                 if (size_partial > 0) {
                     size_request += size_partial;
@@ -61,26 +66,22 @@ int main(int argc, char **argv)
                     break;
                 }
             }
-            if (size_request + 7 < MAX_SIZE_REQUEST) {
-                buf[size_request] = '\r';
-                buf[size_request + 1] = '\n';
-                buf[size_request + 2] = '\r';
-                buf[size_request + 3] = '\n';
-                buf[size_request + 4] = '\r';
-                buf[size_request + 5] = '\n';
-                buf[size_request + 6] = '\0';
-                size_request += 7;
-            } else {
-                _debug_info("(loop:%d) MAX_SIZE_REQUEST\n", loop);
-                buf[size_request - 6] = '\r';
-                buf[size_request - 5] = '\n';
-                buf[MAX_SIZE_REQUEST - 4] = '\r';
-                buf[MAX_SIZE_REQUEST - 3] = '\n';
-                buf[MAX_SIZE_REQUEST - 2] = '\r';
-                buf[MAX_SIZE_REQUEST - 1] = '\n';
-                buf[MAX_SIZE_REQUEST - 0] = '\0';
-                size_request = MAX_SIZE_REQUEST;
+            if (size_request + 7 >= MAX_SIZE_REQUEST) {
+                size_request = MAX_SIZE_REQUEST - 7;
             }
+
+            if (buf[size_request] == '\0')
+                size_request--;
+
+            _debug_info("(loop:%d) MAX_SIZE_REQUEST\n", loop);
+            buf[size_request + 0] = '\r';
+            buf[size_request + 1] = '\n';
+            buf[size_request + 2] = '\r';
+            buf[size_request + 3] = '\n';
+            buf[size_request + 4] = '\r';
+            buf[size_request + 5] = '\n';
+            buf[size_request + 6] = '\0';
+            size_request += 6;
 
             _debug_info("(loop:%d) sending... (size: %d)\n", loop, size_request);
             int s_r = send_request(buf, size_request);
@@ -101,7 +102,7 @@ int main(int argc, char **argv)
         return 0;
     } else // CHILD: HTTP SERVER
     {
-        set_fuzz_server_pid(getpid()); // remove
+        set_fuzz_server_pid(getpid());
         int status = 0;
         pid_t connection_pid = fork();
         if (connection_pid == 0) {
