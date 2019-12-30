@@ -226,12 +226,15 @@ int connect_to(char *hostname, char *portname, int id_request)
         freeaddrinfo(res);
         return -1;
     }
-    freeaddrinfo(res);
+
     if (connect(fd, res->ai_addr, res->ai_addrlen) == -1) {
         close(fd);
         _debug_info("(id_req: %d) Socket connect error: %s\n", id_request, strerror(errno));
         return -1;
     }
+
+    freeaddrinfo(res);
+
     return fd;
 }
 

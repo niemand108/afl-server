@@ -2,6 +2,21 @@
 
 struct logger *loggers[MAX_LOGS_FILES];
 
+void redirect_std_to_log()
+{
+    int fd_err = open_log(LOG_STDERR);
+    int fd_out = open_log(LOG_STDOUT);
+
+    if (dup2(fd_err, STDERR_FILENO) < 0) {
+        _debug_info("cannot redirect stderr to %s, error: %s", LOG_STDERR, strerror(errno));
+    }
+    if (dup2(fd_out, STDOUT_FILENO) < 0) {
+        _debug_info("cannot redirect stderr to %s, error: %s", LOG_STDOUT, strerror(errno));
+    }
+
+    return;
+}
+
 float percent_of_symbols(char *string)
 {
     float total = 0, symbols = 0;

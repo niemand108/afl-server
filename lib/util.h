@@ -11,11 +11,14 @@
 #include <sys/wait.h>
 #include <time.h>
 #include <unistd.h>
+
 #define MAX_LOGS_FILES 10
 #define LOG_STDIN "./logs/sdtin"
 #define LOG_DEBUG "./logs/debug"
 #define LOG_RESPONSE "./logs/response"
 #define LOG_REQUEST "./logs/request"
+#define LOG_STDERR "./logs/stderr"
+#define LOG_STDOUT "./logs/stdout"
 #define MAX_LINE_LOG 300
 
 #ifndef DEBUG_ON
@@ -56,6 +59,7 @@ extern int fd_log(char *);
 extern int close_log(char *);
 extern int close_all_log();
 extern int open_log(char *);
+extern void redirect_std_to_log();
 extern void handler_others_on();
 extern void handler_others_off();
 extern int is_handled(int);

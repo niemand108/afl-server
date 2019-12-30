@@ -99,6 +99,10 @@ int main(int argc, char **argv)
         return 0;
     } else // CHILD: HTTP SERVER
     {
+#ifdef REDIRECT_STD
+        redirect_std_to_log();
+#endif
+        fprintf(stderr, "hola\n");
         set_fuzz_server_pid(getpid());
         int status = 0;
         pid_t connection_pid = fork();
