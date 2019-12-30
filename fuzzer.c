@@ -70,9 +70,6 @@ int main(int argc, char **argv)
                 size_request = MAX_SIZE_REQUEST - 7;
             }
 
-            if (buf[size_request] == '\0')
-                size_request--;
-
             _debug_info("(loop:%d) MAX_SIZE_REQUEST\n", loop);
             buf[size_request + 0] = '\r';
             buf[size_request + 1] = '\n';
