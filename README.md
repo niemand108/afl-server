@@ -60,6 +60,6 @@ Logs
 ```
 ./logs
 ├── debug                   general debugging info
-├── request                 all the requests by id_request
-└── response                all the responses (with the id_request associated)
+├── request                 all requests by id_request
+└── response                all responses (with id_request associated)
 ```
